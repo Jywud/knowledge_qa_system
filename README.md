@@ -10,6 +10,8 @@
 - **智能问答**：选择知识库后提问，支持流式输出、多轮上下文记忆、会话列表和历史记录恢复。
 - **混合检索**：Chroma 向量检索 + LangChain Community `BM25Retriever` 关键词检索，通过 RRF 融合排序。
 - **系统设置**：管理员可配置分块大小、重叠窗口和 TopK。
+- **安全**：登录防暴力破解（连续失败锁定）；敏感操作审计日志落库。
+- **自动化测试**：覆盖登录、用户管理、文件上传核心链路。
 
 默认管理员账号：`admin / 123456`。首次启动自动创建，请尽快修改密码。
 
@@ -122,8 +124,26 @@ npm run dev
 | `OLLAMA_BASE_URL` / `EMBED_MODEL` | 本地 Embedding 服务和模型 |
 | `ARK_BASE_URL` / `ARK_API_KEY` / `ARK_MODEL` | 对话模型接口配置 |
 | `JWT_SECRET` / `JWT_EXPIRE_HOURS` | JWT 签发配置 |
+| `LOGIN_MAX_ATTEMPTS` / `LOGIN_LOCK_MINUTES` | 登录防暴力破解配置 |
 
 注意：管理员在「系统设置」页保存的 `CHUNK_SIZE`、`CHUNK_OVERLAP`、`TOP_K` 优先于 `.env` 中的默认值。
+
+## Docker 部署
+
+在项目根目录创建 `.env`（参考 `backend/.env.example`），至少填写 `JWT_SECRET` 和 `ARK_API_KEY`，然后：
+
+```bash
+docker compose up -d --build
+```
+
+浏览器访问 `http://localhost:8080`（通过 `FRONTEND_PORT` 变量可修改端口）。数据通过 Docker Volume 持久化。
+
+## 运行测试
+
+```bash
+cd backend
+.venv\Scripts\python -m pytest tests/ -v
+```
 
 ## 使用流程
 
@@ -139,5 +159,7 @@ npm run dev
 - [`docs/需求文档.md`](docs/需求文档.md)
 - [`docs/设计文档.md`](docs/设计文档.md)
 - [`docs/检索优化需求与设计.md`](docs/检索优化需求与设计.md)
+- [`docs/登录防暴力破解设计.md`](docs/登录防暴力破解设计.md)
+- [`docs/审计日志与自动化测试设计.md`](docs/审计日志与自动化测试设计.md)
 
 后续以这些文档作为需求与实现对齐基线。

@@ -24,6 +24,8 @@ class Settings(BaseSettings):
 
     jwt_secret: str = "change-me-in-production"
     jwt_expire_hours: int = 24
+    login_max_attempts: int = 5
+    login_lock_minutes: int = 15
 
 
 settings = Settings()

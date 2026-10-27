@@ -81,3 +81,15 @@ class SystemSetting(Base):
     chunk_size: Mapped[int] = mapped_column(Integer, default=800)
     chunk_overlap: Mapped[int] = mapped_column(Integer, default=100)
     top_k: Mapped[int] = mapped_column(Integer, default=5)
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    operator_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    operator_name: Mapped[str] = mapped_column(String(64))
+    action: Mapped[str] = mapped_column(String(64))
+    target: Mapped[str] = mapped_column(String(255), default="")
+    detail: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())

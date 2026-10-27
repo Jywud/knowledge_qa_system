@@ -7,3 +7,4 @@ backend/chroma_data/
 backend/uploads/*
 !backend/uploads/.gitkeep
 frontend/dist/
+.env

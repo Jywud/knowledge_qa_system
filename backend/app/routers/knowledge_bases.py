@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user, require_admin
+from app.audit import log_audit
 from app.database import get_db
 from app.models import Chunk, FileRecord, KnowledgeBase, User
 from app.schemas import KnowledgeBaseCreate, KnowledgeBaseOut, KnowledgeBaseUpdate
@@ -61,6 +62,8 @@ async def create_knowledge_base(
     db.add(kb)
     await db.commit()
     await db.refresh(kb)
+    await log_audit(db, admin, "kb.create", target=kb.name)
+    await db.commit()
     return _kb_out(kb, 0, 0)
 
 
@@ -106,5 +109,7 @@ async def delete_knowledge_base(
         await delete_file_vectors(db, record.id)
         await db.delete(record)
     await db.delete(kb)
+    await db.commit()
+    await log_audit(db, admin, "kb.delete", target=kb.name)
     await db.commit()
     return {"ok": True}

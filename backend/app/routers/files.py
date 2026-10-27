@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import BASE_DIR, settings
 from app.auth import get_current_user, require_admin
+from app.audit import log_audit
 from app.database import get_db
 from app.models import Chunk, FileRecord, KnowledgeBase, User
 from app.schemas import ChunkOut, FileOut
@@ -63,6 +64,7 @@ async def upload_file(
     record.size = len(content)
 
     chunk_count = await ingest_file(db, record.id, save_path, suffix, file.filename, kb_id)
+    await log_audit(db, admin, "file.upload", target=file.filename)
     await db.commit()
     await db.refresh(record)
     return _file_out(record, chunk_count, admin.username)
@@ -142,6 +144,7 @@ async def delete_file(
 
     await delete_file_vectors(db, file_id)
     await db.delete(record)
+    await log_audit(db, admin, "file.delete", target=record.filename)
     await db.commit()
 
     for path in _upload_dir().glob(f"{file_id}_*"):

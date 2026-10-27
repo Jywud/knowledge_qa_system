@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user, hash_password, require_admin
+from app.audit import log_audit
 from app.database import get_db
 from app.models import User
 from app.schemas import CreateUserRequest, PasswordResetRequest, UserOut
@@ -40,6 +41,8 @@ async def create_user(
     db.add(user)
     await db.commit()
     await db.refresh(user)
+    await log_audit(db, admin, "user.create", target=user.username)
+    await db.commit()
     return user
 
 
@@ -54,6 +57,7 @@ async def reset_password(
     if not user:
         raise HTTPException(404, "用户不存在")
     user.password_hash = hash_password(body.password)
+    await log_audit(db, admin, "user.reset_password", target=user.username)
     await db.commit()
     return {"ok": True}
 
@@ -70,5 +74,6 @@ async def delete_user(
     if not user:
         raise HTTPException(404, "用户不存在")
     await db.delete(user)
+    await log_audit(db, admin, "user.delete", target=user.username)
     await db.commit()
     return {"ok": True}
