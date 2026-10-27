@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
       POSTGRES_DB: knowledge_qa
@@ -23,12 +23,12 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/knowledge_qa
       UPLOAD_DIR: /app/uploads
-      CHROMA_DIR: /app/chroma_data
       CHUNK_SIZE: ${CHUNK_SIZE:-800}
       CHUNK_OVERLAP: ${CHUNK_OVERLAP:-100}
       TOP_K: ${TOP_K:-5}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       EMBED_MODEL: ${EMBED_MODEL:-bge-m3}
+      EMBED_DIM: ${EMBED_DIM:-1024}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://ark.cn-beijing.volces.com/api/coding/v3}
       LLM_API_KEY: ${LLM_API_KEY}
       LLM_MODEL: ${LLM_MODEL:-deepseek-v4.1-flash}
@@ -36,7 +36,6 @@ services:
       JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-24}
     volumes:
       - uploads_data:/app/uploads
-      - chroma_data:/app/chroma_data
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -51,4 +50,3 @@ services:
 volumes:
   pg_data:
   uploads_data:
-  chroma_data:

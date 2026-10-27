@@ -14,13 +14,20 @@ from app.routers import knowledge_bases
 from app.routers import settings as settings_router
 from app.database import SessionLocal
 from app.services.rag_service import build_graph
-from app.services.document_service import reindex_missing_kb
+from app.services.document_service import reindex_missing_embeddings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(
+            text(
+                "ALTER TABLE chunks ADD COLUMN IF NOT EXISTS "
+                f"embedding vector({settings.embed_dim})"
+            )
+        )
         await conn.execute(
             text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(16) DEFAULT 'user'")
         )
@@ -28,6 +35,16 @@ async def lifespan(app: FastAPI):
             text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)")
         )
         await conn.execute(text("ALTER TABLE files ADD COLUMN IF NOT EXISTS kb_id INTEGER"))
+        await conn.execute(
+            text("ALTER TABLE files ADD COLUMN IF NOT EXISTS status_message VARCHAR(255)")
+        )
+        await conn.execute(
+            text(
+                "UPDATE files SET status='failed', "
+                "status_message='服务重启导致处理中断，请重新上传' "
+                "WHERE status='processing'"
+            )
+        )
         await conn.execute(
             text("ALTER TABLE conversations ADD COLUMN IF NOT EXISTS kb_id INTEGER")
         )
@@ -68,7 +85,7 @@ async def lifespan(app: FastAPI):
             text("UPDATE files SET kb_id=:kb_id WHERE kb_id IS NULL"), {"kb_id": default_kb_id}
         )
     async with SessionLocal() as db:
-        await reindex_missing_kb(db)
+        await reindex_missing_embeddings(db)
     async with AsyncPostgresSaver.from_conn_string(settings.database_url) as checkpointer:
         await checkpointer.setup()
         app.state.checkpointer = checkpointer

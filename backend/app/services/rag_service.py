@@ -6,12 +6,12 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.graph import START, StateGraph, add_messages
 
 from app.config import settings
-from app.services.document_service import get_vectorstore
 from app.services.retrieval_service import hybrid_search
 
-RAG_SYSTEM_PROMPT = """你是企业知识库问答助手。请根据下面提供的知识库内容回答用户问题。
-- 如果知识库内容包含答案，请在回答中标注来源编号，例如 [来源1]。
-- 如果知识库内容不足以回答，请明确说明，并基于常识谨慎回答。
+RAG_SYSTEM_PROMPT = """你是企业知识库问答助手。请严格依据下面提供的知识库内容回答用户问题。
+- 只使用知识库内容作答，不要基于常识补充知识库中不存在的信息。
+- 如果知识库内容与问题无关或不足以回答，直接说明知识库中没有相关内容，不要编造答案。
+- 只有在回答中实际引用了知识库内容时才标注来源编号，例如 [来源1]；没有引用时不要输出来源标注。
 - 用中文回答，保持简洁专业。
 
 知识库内容：
@@ -52,20 +52,23 @@ def extract_text(content: Any) -> str:
     return str(content or "")
 
 
-def make_chat_node(llm: ChatOpenAI, vectorstore):
+def make_chat_node(llm: ChatOpenAI):
     async def chat_node(state: ChatState):
         query = extract_text(state["messages"][-1].content)
         kb_id = state.get("kb_id")
         top_k = state.get("top_k") or settings.top_k
         if kb_id:
-            docs = await hybrid_search(query, int(kb_id), top_k, vectorstore)
+            docs = await hybrid_search(query, int(kb_id), top_k)
         else:
-            docs = await hybrid_search(query, None, top_k, vectorstore)
+            docs = await hybrid_search(query, None, top_k)
         sources = [
             {
                 "index": i + 1,
                 "source": d.metadata.get("source", ""),
                 "page": d.metadata.get("page", 0),
+                "file_id": d.metadata.get("file_id"),
+                "chunk_index": d.metadata.get("chunk_index"),
+                "excerpt": d.page_content[:150].replace("\n", " ") + ("…" if len(d.page_content) > 150 else ""),
             }
             for i, d in enumerate(docs)
         ]
@@ -81,6 +84,6 @@ def make_chat_node(llm: ChatOpenAI, vectorstore):
 
 def build_graph(checkpointer: AsyncPostgresSaver):
     graph = StateGraph(ChatState)
-    graph.add_node("chat", make_chat_node(build_llm(), get_vectorstore()))
+    graph.add_node("chat", make_chat_node(build_llm()))
     graph.add_edge(START, "chat")
     return graph.compile(checkpointer=checkpointer)

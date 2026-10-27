@@ -8,7 +8,7 @@
 - **多知识库**：管理员创建 / 编辑 / 删除知识库，用户可查看知识库列表与统计。
 - **文件管理**：支持 `md` / `txt` / `docx` / `pdf`；管理员可在指定知识库内上传、更新、删除文件并查看分块。
 - **智能问答**：选择知识库后提问，支持流式输出、多轮上下文记忆、会话列表和历史记录恢复。
-- **混合检索**：Chroma 向量检索 + LangChain Community `BM25Retriever` 关键词检索，通过 RRF 融合排序。
+- **混合检索**：pgvector 向量检索 + LangChain Community `BM25Retriever` 关键词检索，通过 RRF 融合排序。
 - **系统设置**：管理员可配置分块大小、重叠窗口和 TopK。
 - **安全**：登录防暴力破解（连续失败锁定）；敏感操作审计日志落库。
 - **自动化测试**：覆盖登录、用户管理、文件上传核心链路。
@@ -22,7 +22,7 @@
 | 前端 | Vite + Vue 3 + Element Plus + Vue Router |
 | 后端 | Python 3.13 + FastAPI + SQLAlchemy Async |
 | 编排 | LangChain 1.x / LangGraph |
-| 向量库 | ChromaDB（本地持久化） |
+| 向量库 | pgvector（PostgreSQL 扩展，向量与 chunk 同库同事务） |
 | 关系库 | PostgreSQL（本地 Docker） |
 | Embedding | Ollama `bge-m3` |
 | 对话模型 | OpenAI 兼容协议（默认火山方舟，可替换其他供应商） |
@@ -118,7 +118,7 @@ npm run dev
 | 配置项 | 说明 |
 |---|---|
 | `DATABASE_URL` | PostgreSQL 连接串 |
-| `UPLOAD_DIR` / `CHROMA_DIR` | 上传文件和向量库目录 |
+| `UPLOAD_DIR` / `EMBED_DIM` | 上传文件目录、向量维度（默认 1024，对应 bge-m3） |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | 分块参数默认值 |
 | `TOP_K` | TopK 默认值 |
 | `OLLAMA_BASE_URL` / `EMBED_MODEL` | 本地 Embedding 服务和模型 |

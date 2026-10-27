@@ -1,9 +1,11 @@
 import datetime as dt
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.config import settings
 
 
 class User(Base):
@@ -36,6 +38,7 @@ class FileRecord(Base):
     size: Mapped[int] = mapped_column(Integer, default=0)
     version: Mapped[int] = mapped_column(Integer, default=1)
     status: Mapped[str] = mapped_column(String(16), default="ready")
+    status_message: Mapped[str | None] = mapped_column(String(255), nullable=True)
     uploaded_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[dt.datetime] = mapped_column(
@@ -51,6 +54,7 @@ class Chunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer)
     page_no: Mapped[int] = mapped_column(Integer, default=0)
     content: Mapped[str] = mapped_column(Text)
+    embedding = mapped_column(Vector(settings.embed_dim), nullable=True)
 
 
 class Conversation(Base):

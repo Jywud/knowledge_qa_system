@@ -50,7 +50,7 @@ async function removeConversation(conv) {
           :class="{ active: conv.id === currentConversationId }"
           @click="openConversation(conv.id)"
         >
-            <span class="conv-name">{{ conv.title }}</span>
+            <span class="conv-name">{{ conv.title || "新对话" }}</span>
             <span class="conv-kb">{{ kbName(conv.kb_id) }}</span>
             <el-icon class="del-btn" @click.stop="removeConversation(conv)">
               <Delete />

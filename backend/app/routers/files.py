@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import aiofiles
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,7 +11,11 @@ from app.audit import log_audit
 from app.database import get_db
 from app.models import Chunk, FileRecord, KnowledgeBase, User
 from app.schemas import ChunkOut, FileOut
-from app.services.document_service import SUPPORTED_TYPES, delete_file_vectors, ingest_file
+from app.services.document_service import (
+    SUPPORTED_TYPES,
+    delete_file_vectors,
+    process_file_record,
+)
 
 router = APIRouter(prefix="/api/files", tags=["files"])
 
@@ -31,6 +35,7 @@ def _file_out(record: FileRecord, chunk_count: int, uploader: str = "") -> FileO
         size=record.size,
         version=record.version,
         status=record.status,
+        status_message=record.status_message or "",
         chunk_count=chunk_count,
         uploader=uploader,
         created_at=record.created_at,
@@ -39,6 +44,7 @@ def _file_out(record: FileRecord, chunk_count: int, uploader: str = "") -> FileO
 
 @router.post("", response_model=FileOut)
 async def upload_file(
+    background_tasks: BackgroundTasks,
     admin: User = Depends(require_admin),
     file: UploadFile = File(...),
     kb_id: int = Form(...),
@@ -52,7 +58,11 @@ async def upload_file(
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 md/docx/pdf/txt")
 
     record = FileRecord(
-        kb_id=kb_id, filename=file.filename, file_type=suffix, uploaded_by=admin.id
+        kb_id=kb_id,
+        filename=file.filename,
+        file_type=suffix,
+        status="processing",
+        uploaded_by=admin.id,
     )
     db.add(record)
     await db.flush()
@@ -63,11 +73,13 @@ async def upload_file(
         await out.write(content)
     record.size = len(content)
 
-    chunk_count = await ingest_file(db, record.id, save_path, suffix, file.filename, kb_id)
     await log_audit(db, admin, "file.upload", target=file.filename)
     await db.commit()
     await db.refresh(record)
-    return _file_out(record, chunk_count, admin.username)
+    background_tasks.add_task(
+        process_file_record, record.id, save_path, suffix, file.filename, kb_id
+    )
+    return _file_out(record, 0, admin.username)
 
 
 @router.get("", response_model=list[FileOut])
@@ -104,6 +116,7 @@ async def get_chunks(
 @router.put("/{file_id}", response_model=FileOut)
 async def update_file(
     file_id: int,
+    background_tasks: BackgroundTasks,
     admin: User = Depends(require_admin),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -111,6 +124,8 @@ async def update_file(
     record = await db.get(FileRecord, file_id)
     if not record:
         raise HTTPException(404, "文件不存在")
+    if record.status == "processing":
+        raise HTTPException(409, "文件正在后台处理中，请稍后再试")
     suffix = Path(file.filename).suffix.lstrip(".").lower()
     if suffix not in SUPPORTED_TYPES:
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 md/docx/pdf/txt")
@@ -126,10 +141,14 @@ async def update_file(
     record.file_type = suffix
     record.size = len(content)
     record.version += 1
-    chunk_count = await ingest_file(db, file_id, save_path, suffix, file.filename)
+    record.status = "processing"
+    record.status_message = None
     await db.commit()
     await db.refresh(record)
-    return _file_out(record, chunk_count, admin.username)
+    background_tasks.add_task(
+        process_file_record, file_id, save_path, suffix, file.filename, record.kb_id
+    )
+    return _file_out(record, 0, admin.username)
 
 
 @router.delete("/{file_id}")
@@ -141,6 +160,8 @@ async def delete_file(
     record = await db.get(FileRecord, file_id)
     if not record:
         raise HTTPException(404, "文件不存在")
+    if record.status == "processing":
+        raise HTTPException(409, "文件正在后台处理中，无法删除")
 
     await delete_file_vectors(db, file_id)
     await db.delete(record)

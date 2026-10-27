@@ -62,6 +62,7 @@ class FileOut(BaseModel):
     size: int
     version: int
     status: str
+    status_message: str = ""
     chunk_count: int = 0
     uploader: str = ""
     created_at: datetime

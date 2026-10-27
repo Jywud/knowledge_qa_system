@@ -1,4 +1,6 @@
+import asyncio
 import json
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -15,6 +17,8 @@ from app.services.settings_service import get_system_settings
 
 router = APIRouter(prefix="/api/conversations", tags=["chat"])
 
+_background_tasks: set[asyncio.Task] = set()
+
 
 @router.post("", response_model=ConversationOut)
 async def create_conversation(
@@ -23,7 +27,7 @@ async def create_conversation(
     db: AsyncSession = Depends(get_db),
 ):
     conv = Conversation(
-        user_id=user.id, title=body.title or "新对话", kb_id=body.kb_id
+        user_id=user.id, title=body.title or "", kb_id=body.kb_id
     )
     db.add(conv)
     await db.commit()
@@ -98,7 +102,7 @@ async def chat(
     conv = await db.get(Conversation, conversation_id)
     if not conv or conv.user_id != user.id:
         raise HTTPException(404, "会话不存在")
-    if conv.title == "新对话":
+    if not conv.title:
         conv.title = body.content[:20]
     if conv.kb_id is None and body.kb_id:
         conv.kb_id = body.kb_id
@@ -110,10 +114,10 @@ async def chat(
     user_msg = HumanMessage(content=body.content)
     system_settings = await get_system_settings(db)
 
-    async def event_stream():
+    async def run_generation(queue: asyncio.Queue):
         full_text = ""
         try:
-            yield f"data: {json.dumps({'type': 'start'}, ensure_ascii=False)}\n\n"
+            await queue.put({"type": "start"})
             async for chunk, _metadata in graph.astream(
                 {
                     "messages": [user_msg],
@@ -128,9 +132,38 @@ async def chat(
                 text = extract_text(chunk.content)
                 if text:
                     full_text += text
-                    yield f"data: {json.dumps({'type': 'token', 'content': text}, ensure_ascii=False)}\n\n"
+                    await queue.put({"type": "token", "content": text})
             state = await graph.aget_state(config)
             sources = state.values.get("sources", [])
+            cited = {int(num) for num in re.findall(r"\[来源(\d+)\]", full_text)}
+            if cited:
+                sources = [source for source in sources if source["index"] in cited]
+            else:
+                sources = []
+            grouped: dict[str, dict] = {}
+            for source in sources:
+                entry = grouped.setdefault(
+                    source["source"],
+                    {
+                        "source": source["source"],
+                        "file_type": source.get("file_type", ""),
+                        "kb_name": source.get("kb_name", ""),
+                        "count": 0,
+                        "excerpts": [],
+                    },
+                )
+                entry["count"] += 1
+                excerpt = source.get("excerpt", "")
+                if excerpt and all(item["index"] != source["index"] for item in entry["excerpts"]):
+                    entry["excerpts"].append(
+                        {
+                            "index": source["index"],
+                            "file_id": source.get("file_id"),
+                            "chunk_index": source.get("chunk_index"),
+                            "text": excerpt,
+                        }
+                    )
+            sources = list(grouped.values())
             async with SessionLocal() as save_db:
                 save_db.add(
                     Message(
@@ -141,10 +174,26 @@ async def chat(
                     )
                 )
                 await save_db.commit()
-            yield f"data: {json.dumps({'type': 'sources', 'sources': sources}, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'type': 'done'}, ensure_ascii=False)}\n\n"
+            await queue.put({"type": "sources", "sources": sources})
         except Exception as exc:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(exc)}, ensure_ascii=False)}\n\n"
+            await queue.put({"type": "error", "message": str(exc)})
+        finally:
+            await queue.put({"type": "done"})
+
+    queue: asyncio.Queue = asyncio.Queue()
+    task = asyncio.create_task(run_generation(queue))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+
+    async def event_stream():
+        try:
+            while True:
+                event = await queue.get()
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event["type"] == "done":
+                    break
+        except asyncio.CancelledError:
+            pass
 
     return StreamingResponse(
         event_stream(),

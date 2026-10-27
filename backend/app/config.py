@@ -10,10 +10,11 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql://postgres:postgres@localhost:5432/knowledge_qa"
     upload_dir: str = "uploads"
-    chroma_dir: str = "chroma_data"
     chunk_size: int = 800
     chunk_overlap: int = 100
     top_k: int = 5
+    embed_dim: int = 1024
+    retrieval_min_score: float = 0.5
 
     ollama_base_url: str = "http://localhost:11434"
     embed_model: str = "bge-m3"

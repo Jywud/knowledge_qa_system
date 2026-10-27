@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 .env
 backend/chroma_data/
+backend/pgvector_data/
 backend/uploads/*
 !backend/uploads/.gitkeep
 frontend/dist/
