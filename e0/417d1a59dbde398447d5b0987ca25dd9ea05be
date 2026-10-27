@@ -1,0 +1,32 @@
+backend/.env.example
+  af6e260bdfd2a953 9-11
+backend/app/config.py
+  af6e260bdfd2a953 21-23
+backend/app/services/rag_service.py
+  af6e260bdfd2a953 30-31,33-35
+docker-compose.yml
+  af6e260bdfd2a953 32-34
+README.md
+  af6e260bdfd2a953 28,63,85,125,133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "e0417d1a59dbde398447d5b0987ca25dd9ea05be",
+  "prompts": {
+    "af6e260bdfd2a953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17098-ae3f-7d22-8e25-2d372e6a64ba",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 19,
+      "accepted_lines": 19,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/3d2353b233b9cae9704d1aba1660fac381bef33b1c67f487ba159029f5868733"
+    }
+  }
+}
