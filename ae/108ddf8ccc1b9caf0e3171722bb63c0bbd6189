@@ -1,0 +1,46 @@
+README.md
+  af6e260bdfd2a953 9-10,12,43-44,125-126,155,165-168
+backend/pytest.ini
+  af6e260bdfd2a953 3-4
+backend/tests/test_retrieval_regression.py
+  af6e260bdfd2a953 1-30
+backend/app/main.py
+  af6e260bdfd2a953 32-36
+.gitignore
+  af6e260bdfd2a953 2-3
+backend/app/config.py
+  af6e260bdfd2a953 18
+backend/app/services/retrieval_service.py
+  af6e260bdfd2a953 131-139
+docs/需求文档.md
+  af6e260bdfd2a953 3,24-27,37,39,59,65-66
+backend/.env.example
+  af6e260bdfd2a953 7-8
+docs/关键词检索优化设计.md
+  af6e260bdfd2a953 1-40
+docs/设计文档.md
+  af6e260bdfd2a953 3,13,35,38-39,61-72,83-88,95-96,98-99,101-102,114,165,167-169
+backend/app/services/rag_service.py
+  af6e260bdfd2a953 79-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "ae108ddf8ccc1b9caf0e3171722bb63c0bbd6189",
+  "prompts": {
+    "af6e260bdfd2a953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17098-ae3f-7d22-8e25-2d372e6a64ba",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 167,
+      "total_deletions": 39,
+      "accepted_lines": 731,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/93ccd24ced556aca93ba46cd24952ab0fa6c4aa6bac34bcd736d72cb1d3829d3"
+    }
+  }
+}
