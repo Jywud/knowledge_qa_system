@@ -1,0 +1,54 @@
+backend/tests/test_docx_split.py
+  af6e260bdfd2a953 1-42
+backend/app/schemas.py
+  af6e260bdfd2a953 65
+backend/app/main.py
+  af6e260bdfd2a953 39-47
+backend/app/models.py
+  af6e260bdfd2a953 41
+backend/tests/test_files.py
+  af6e260bdfd2a953 12-15,20
+backend/app/services/document_service.py
+  af6e260bdfd2a953 5-9,14,32-37,40-52,55-75,77-150,189,200-212,216-217,220-221,223-224,227-229,233-254,256
+backend/requirements.txt
+  af6e260bdfd2a953 17
+frontend/src/components/AppSidebar.vue
+  af6e260bdfd2a953 53
+backend/app/routers/chat.py
+  af6e260bdfd2a953 30,105,117,120,135,138-165
+docs/pgvector迁移设计.md
+  af6e260bdfd2a953 1-80
+backend/app/services/rag_service.py
+  af6e260bdfd2a953 69-71
+backend/app/routers/files.py
+  af6e260bdfd2a953 4,14-18,38,47,61-65,79-82,119,127-128,144-145,148-151,163-164
+docs/异步向量化设计.md
+  af6e260bdfd2a953 1-68
+docs/docx切分优化设计.md
+  af6e260bdfd2a953 1-50
+frontend/src/views/ChatView.vue
+  af6e260bdfd2a953 18-42,69,97-103,107-111,148-149,172-183,188,191-192,194-197,223-229,356-392,403-459
+frontend/src/views/FileManager.vue
+  af6e260bdfd2a953 2,10-12,17,41,44-61,66,69,73-75,84,95,99-102,112-118,138,141-143,146,158-163,166,169-199,204,206-213,215-224,226-228,235-246,263-298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "e524caf975c478ae253998a0029f9491334808a5",
+  "prompts": {
+    "af6e260bdfd2a953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17098-ae3f-7d22-8e25-2d372e6a64ba",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 1379,
+      "total_deletions": 113,
+      "accepted_lines": 1342,
+      "overriden_lines": 13,
+      "messages_url": "https://git-ai.hsjdata.com/cas/de038a8a8c9b6693aac9944bc9cae5abcebac989f24bd0faf2d179a28615da8c"
+    }
+  }
+}
