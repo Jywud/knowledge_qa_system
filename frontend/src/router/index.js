@@ -1,12 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
 import AppLayout from "../components/AppLayout.vue";
-import Login from "../views/Login.vue";
-import HomeView from "../views/HomeView.vue";
-import ChatView from "../views/ChatView.vue";
-import FileManager from "../views/FileManager.vue";
-import KnowledgeBases from "../views/KnowledgeBases.vue";
-import UserManage from "../views/UserManage.vue";
-import SystemSettings from "../views/SystemSettings.vue";
 import { token } from "../store";
 
 const router = createRouter({
@@ -17,15 +10,15 @@ const router = createRouter({
       component: AppLayout,
       children: [
         { path: "", redirect: "/home" },
-        { path: "chat", component: ChatView },
-        { path: "knowledge-bases", component: KnowledgeBases },
-        { path: "files", component: FileManager },
-        { path: "users", component: UserManage },
-        { path: "settings", component: SystemSettings },
+        { path: "chat", component: () => import("../views/ChatView.vue") },
+        { path: "knowledge-bases", component: () => import("../views/KnowledgeBases.vue") },
+        { path: "files", component: () => import("../views/FileManager.vue") },
+        { path: "users", component: () => import("../views/UserManage.vue") },
+        { path: "settings", component: () => import("../views/SystemSettings.vue") },
       ],
     },
-    { path: "/home", component: HomeView },
-    { path: "/login", component: Login },
+    { path: "/home", component: () => import("../views/HomeView.vue") },
+    { path: "/login", component: () => import("../views/Login.vue") },
   ],
 });
 

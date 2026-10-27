@@ -26,6 +26,11 @@ class PasswordResetRequest(BaseModel):
     password: str
 
 
+class PasswordChangeRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+
 class ChunkOut(BaseModel):
     id: int
     chunk_index: int

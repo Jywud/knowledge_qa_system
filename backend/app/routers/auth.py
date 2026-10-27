@@ -7,7 +7,9 @@ from app.config import settings
 from app.auth import create_token, get_current_user, verify_password
 from app.database import get_db
 from app.models import User
-from app.schemas import LoginRequest, UserOut
+from app.auth import hash_password
+from app.audit import log_audit
+from app.schemas import LoginRequest, PasswordChangeRequest, UserOut
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -55,3 +57,22 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(get_current_user)):
     return user
+
+
+@router.put("/password")
+async def change_password(
+    body: PasswordChangeRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not verify_password(body.old_password, user.password_hash):
+        raise HTTPException(400, "原密码错误")
+    if len(body.new_password) < 6:
+        raise HTTPException(400, "新密码至少 6 位")
+    if body.new_password == body.old_password:
+        raise HTTPException(400, "新密码不能与原密码相同")
+
+    user.password_hash = hash_password(body.new_password)
+    await log_audit(db, user, "user.change_password", target=user.username)
+    await db.commit()
+    return {"ok": True}

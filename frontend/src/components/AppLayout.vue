@@ -1,5 +1,7 @@
 <script setup>
-import { computed, onMounted } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
+import { ElMessage } from "element-plus";
+import { Collection, Lock, Setting, SwitchButton, User } from "@element-plus/icons-vue";
 import { useRouter } from "vue-router";
 import AppSidebar from "./AppSidebar.vue";
 import {
@@ -18,6 +20,26 @@ const router = useRouter();
 
 const isChat = computed(() => router.currentRoute.value.path === "/chat");
 const kbLocked = computed(() => !!currentConversationId.value);
+const passwordDialog = ref(false);
+const passwordFormRef = ref(null);
+const passwordForm = reactive({ oldPassword: "", newPassword: "", confirmPassword: "" });
+const passwordRules = {
+  oldPassword: [{ required: true, message: "请输入原密码", trigger: "blur" }],
+  newPassword: [
+    { required: true, message: "请输入新密码", trigger: "blur" },
+    { min: 6, message: "密码至少 6 位", trigger: "blur" },
+  ],
+  confirmPassword: [
+    { required: true, message: "请再次输入新密码", trigger: "blur" },
+    {
+      validator: (_, value, callback) => {
+        if (value !== passwordForm.newPassword) callback(new Error("两次输入的密码不一致"));
+        else callback();
+      },
+      trigger: "blur",
+    },
+  ],
+};
 
 function kbSelectable(kb) {
   return kb.chunk_count > 0;
@@ -44,11 +66,34 @@ onMounted(async () => {
 });
 
 function handleCommand(command) {
-  if (command === "logout") {
+  if (command === "change-password") {
+    openPasswordDialog();
+  } else if (command === "logout") {
     clearAuth();
     router.push("/login");
   } else {
     router.push(`/${command}`);
+  }
+}
+
+function openPasswordDialog() {
+  passwordForm.oldPassword = "";
+  passwordForm.newPassword = "";
+  passwordForm.confirmPassword = "";
+  passwordDialog.value = true;
+}
+
+async function changePassword() {
+  await passwordFormRef.value.validate();
+  try {
+    await api.put("/auth/password", {
+      old_password: passwordForm.oldPassword,
+      new_password: passwordForm.newPassword,
+    });
+    ElMessage.success("密码修改成功");
+    passwordDialog.value = false;
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || "密码修改失败");
   }
 }
 </script>
@@ -105,10 +150,11 @@ function handleCommand(command) {
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item v-if="user.role === 'admin'" command="users">用户管理</el-dropdown-item>
-                <el-dropdown-item command="knowledge-bases">知识库</el-dropdown-item>
-                <el-dropdown-item v-if="user.role === 'admin'" command="settings">系统设置</el-dropdown-item>
-                <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+                <el-dropdown-item :icon="Lock" command="change-password">修改密码</el-dropdown-item>
+                <el-dropdown-item v-if="user.role === 'admin'" :icon="User" command="users">用户管理</el-dropdown-item>
+                <el-dropdown-item :icon="Collection" command="knowledge-bases">知识库</el-dropdown-item>
+                <el-dropdown-item v-if="user.role === 'admin'" :icon="Setting" command="settings">系统设置</el-dropdown-item>
+                <el-dropdown-item :icon="SwitchButton" command="logout" divided>退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -118,6 +164,23 @@ function handleCommand(command) {
         <router-view />
       </el-main>
     </el-container>
+    <el-dialog v-model="passwordDialog" title="修改密码" width="420px">
+      <el-form ref="passwordFormRef" :model="passwordForm" :rules="passwordRules" label-width="80px">
+        <el-form-item label="原密码" prop="oldPassword">
+          <el-input v-model="passwordForm.oldPassword" type="password" show-password />
+        </el-form-item>
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input v-model="passwordForm.newPassword" type="password" show-password placeholder="至少 6 位" />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input v-model="passwordForm.confirmPassword" type="password" show-password />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="passwordDialog = false">取消</el-button>
+        <el-button type="primary" @click="changePassword">确定</el-button>
+      </template>
+    </el-dialog>
   </el-container>
 </template>
 
