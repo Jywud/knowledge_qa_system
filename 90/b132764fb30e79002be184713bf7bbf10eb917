@@ -1,0 +1,26 @@
+.gitignore
+  af6e260bdfd2a953 1-9
+README.md
+  af6e260bdfd2a953 1-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "90b132764fb30e79002be184713bf7bbf10eb917",
+  "prompts": {
+    "af6e260bdfd2a953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17098-ae3f-7d22-8e25-2d372e6a64ba",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 152,
+      "total_deletions": 0,
+      "accepted_lines": 152,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/7800d91a22f95a1aaa75ff06498ec09295d426263260ee15dbc99be99edc4afd"
+    }
+  }
+}
