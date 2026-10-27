@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>方案 A · 极简浅色编辑风</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#fafafb;color:#1b1f24;font-family:Inter,"Microsoft YaHei","PingFang SC",sans-serif;line-height:1.5}
+.shell{max-width:1240px;margin:0 auto;padding:0 44px}
+.top{display:flex;align-items:center;justify-content:space-between;height:84px}
+.logo{display:flex;align-items:center;gap:12px;font-weight:800;font-size:19px}
+.mark{width:32px;height:32px;border-radius:9px;background:#0f766e;display:grid;place-items:center;color:#fff}
+.nav{display:flex;gap:30px;color:#63696f;font-size:15px}
+.nav a{text-decoration:none;color:inherit}
+.nav a.active{color:#0f766e;font-weight:600}
+.user{display:flex;align-items:center;gap:14px}
+.btn{height:42px;padding:0 22px;border:0;border-radius:9px;font-size:15px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.btn.primary{background:#111827;color:#fff}
+.btn.ghost{background:transparent;border:1px solid #d9dee3;color:#111827}
+.hero{position:relative;padding:96px 0 64px}
+.hero::before{content:"";position:absolute;left:-44px;top:24px;right:-44px;bottom:0;border:1px solid #e7eaee;border-radius:2px}
+.pill{display:inline-flex;padding:7px 13px;border:1px solid #dbe4e2;background:#f2f9f7;color:#0f766e;border-radius:99px;font-size:13px;font-weight:600}
+h1{font-size:74px;line-height:1.04;letter-spacing:-.05em;margin:26px 0 22px}
+h1 em{font-style:normal;color:#0f766e}
+.sub{max-width:640px;font-size:20px;color:#5c646d}
+.actions{display:flex;gap:14px;margin:36px 0 64px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #dfe3e8;border-bottom:1px solid #dfe3e8}
+.stat{padding:30px 8px;border-right:1px solid #dfe3e8}
+.stat:last-child{border-right:0}
+.num{font-size:34px;font-weight:750;letter-spacing:-.03em}
+.label{margin-top:5px;color:#697077;font-size:14px}
+.features{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:64px}
+.card{background:#fff;border:1px solid #e5e8ec;padding:30px;position:relative}
+.icon{width:44px;height:44px;border-radius:12px;background:#f0f7f5;display:grid;place-items:center;color:#0f766e;margin-bottom:20px}
+.card h3{font-size:21px;margin-bottom:10px}
+.card p{color:#68707a;font-size:15px}
+.recents{margin:84px 0 100px}
+.section-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:24px}
+.section-head h2{font-size:32px}
+.list{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.item{background:#fff;border:1px solid #e5e8ec;padding:24px;transition:.2s}
+.item:hover{border-color:#0f766e;transform:translateY(-2px)}
+.title{font-weight:650;margin-bottom:8px}
+.meta{color:#70777e;font-size:13px}
+.footer{height:76px;border-top:1px solid #e5e8ec;display:flex;align-items:center;justify-content:space-between;color:#7a828a;font-size:13px}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div class="logo"><span class="mark">K</span>企业知识库问答</div>
+    <nav class="nav"><a href="#" class="active">首页</a><a href="#">对话问答</a><a href="#">知识库</a><a href="#">文件管理</a></nav>
+    <div class="user"><a class="btn ghost" href="#">管理后台</a><div style="width:34px;height:34px;border-radius:50%;background:#dbe7e5;color:#0f766e;display:grid;place-items:center;font-weight:700">A</div></div>
+  </header>
+  <main>
+    <section class="hero">
+      <div class="pill">● 已接入 3 个企业知识库</div>
+      <h1>让企业知识<br>随时<em>可问</em>、可信、可溯源</h1>
+      <p class="sub">上传 Markdown、Word、PDF，自动切分并向量化。选择知识库即可开启流式问答，保留完整多轮对话记忆。</p>
+      <div class="actions"><a class="btn primary" href="#">开始对话</a><a class="btn ghost" href="#">浏览知识库</a></div>
+      <div class="stats">
+        <div class="stat"><div class="num">3</div><div class="label">知识库</div></div>
+        <div class="stat"><div class="num">12</div><div class="label">文档</div></div>
+        <div class="stat"><div class="num">1,286</div><div class="label">知识分块</div></div>
+        <div class="stat"><div class="num">48</div><div class="label">问答会话</div></div>
+      </div>
+    </section>
+    <section class="features">
+      <div class="card"><div class="icon">▤</div><h3>多知识库隔离</h3><p>按团队、产品或制度创建独立知识库，检索范围清晰可控，不串库。</p></div>
+      <div class="card"><div class="icon">◈</div><h3>流式溯源问答</h3><p>基于 LangGraph 编排检索与回答，答案边生成边展示，并标注来源文档。</p></div>
+      <div class="card"><div class="icon">⌘</div><h3>多格式解析</h3><p>支持 Markdown、Word 和 PDF，统一结构化解析与合理分块入库。</p></div>
+    </section>
+    <section class="recents">
+      <div class="section-head"><h2>最近会话</h2><a class="btn ghost" href="#">查看全部</a></div>
+      <div class="list">
+        <div class="item"><div class="title">员工差旅报销流程梳理</div><div class="meta">制度知识库 · 8 分钟前 · 14 条消息</div></div>
+        <div class="item"><div class="title">产品模块功能核对</div><div class="meta">产品知识库 · 昨天 · 26 条消息</div></div>
+        <div class="item"><div class="title">技术架构升级调研</div><div class="meta">研发知识库 · 2 天前 · 9 条消息</div></div>
+      </div>
+    </section>
+  </main>
+  <footer class="footer"><span>© 2026 Enterprise Knowledge QA</span><span>Powered by LangChain · FastAPI · ChromaDB</span></footer>
+</div>
+</body>
+</html>
