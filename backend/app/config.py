@@ -19,6 +19,10 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "http://localhost:11434"
     embed_model: str = "bge-m3"
+    embed_provider: str = "ollama"
+    embed_openai_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    embed_openai_api_key: str = ""
+    embed_openai_dimensions: int | None = None
 
     llm_base_url: str = "https://ark.cn-beijing.volces.com/api/coding/v3"
     llm_api_key: str = ""

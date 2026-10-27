@@ -25,7 +25,7 @@
 | 编排 | LangChain 1.x / LangGraph |
 | 向量库 | pgvector（PostgreSQL 扩展，向量与 chunk 同库同事务） |
 | 关系库 | PostgreSQL（本地 Docker） |
-| Embedding | Ollama `bge-m3` |
+| Embedding | 默认 Ollama `bge-m3`；支持 OpenAI 兼容在线模型（如阿里云百炼） |
 | 对话模型 | OpenAI 兼容协议（默认火山方舟，可替换其他供应商） |
 | 对话记忆 | LangGraph Postgres Checkpoint |
 
@@ -124,12 +124,17 @@ npm run dev
 | `TOP_K` | TopK 默认值 |
 | `RETRIEVAL_MIN_SCORE` | 向量相似度阈值（默认 `0.5`，越低越宽松） |
 | `MAX_HISTORY_MESSAGES` | 发送给大模型的最近历史消息数（默认 `20`） |
+| `EMBED_PROVIDER` | Embedding 供应商：`ollama` 或 `openai` |
 | `OLLAMA_BASE_URL` / `EMBED_MODEL` | 本地 Embedding 服务和模型 |
+| `EMBED_OPENAI_BASE_URL` / `EMBED_OPENAI_API_KEY` | OpenAI 兼容在线 Embedding 地址和密钥 |
+| `EMBED_OPENAI_DIMENSIONS` / `EMBED_DIM` | 在线模型输出维度和 PostgreSQL 向量列维度，必须一致 |
 | `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | 大模型接口配置（OpenAI 兼容协议） |
 | `JWT_SECRET` / `JWT_EXPIRE_HOURS` | JWT 签发配置 |
 | `LOGIN_MAX_ATTEMPTS` / `LOGIN_LOCK_MINUTES` | 登录防暴力破解配置 |
 
 注意：管理员在「系统设置」页保存的 `CHUNK_SIZE`、`CHUNK_OVERLAP`、`TOP_K` 优先于 `.env` 中的默认值。
+
+切换在线 Embedding 时，请确认 `EMBED_DIM` 与模型输出维度一致。例如阿里云百炼 `text-embedding-v3` 可配置 `1024`。不同维度模型之间切换需要清空并重建已有向量数据。
 
 ## Docker 部署
 

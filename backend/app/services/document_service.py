@@ -10,6 +10,7 @@ from docx.text.paragraph import Paragraph as DocxParagraph
 from langchain_core.documents import Document
 from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
 from langchain_ollama import OllamaEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +22,22 @@ from app.services.settings_service import get_system_settings
 SUPPORTED_TYPES = {"md", "docx", "pdf", "txt"}
 
 
-def get_embeddings() -> OllamaEmbeddings:
+def get_embeddings() -> OllamaEmbeddings | OpenAIEmbeddings:
+    if settings.embed_provider == "openai":
+        if not settings.embed_openai_api_key:
+            raise RuntimeError("EMBED_OPENAI_API_KEY 未配置，请在 backend/.env 中填写")
+        kwargs = {
+            "model": settings.embed_model,
+            "api_key": settings.embed_openai_api_key,
+            "base_url": settings.embed_openai_base_url,
+            "check_embedding_ctx_length": False,
+        }
+        if settings.embed_openai_dimensions is not None:
+            kwargs["dimensions"] = settings.embed_openai_dimensions
+        return OpenAIEmbeddings(**kwargs)
+    if settings.embed_provider != "ollama":
+        raise RuntimeError("EMBED_PROVIDER 仅支持 ollama 或 openai")
+
     return OllamaEmbeddings(
         model=settings.embed_model,
         base_url=settings.ollama_base_url,
