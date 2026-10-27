@@ -1,0 +1,38 @@
+docs/设计文档.md
+  af6e260bdfd2a953 3,32,45,47,123,150-151
+backend/tests/test_auth.py
+  af6e260bdfd2a953 26-54
+docs/需求文档.md
+  af6e260bdfd2a953 48
+frontend/src/router/index.js
+  af6e260bdfd2a953 13-17,20-21
+README.md
+  af6e260bdfd2a953 8
+frontend/src/components/AppLayout.vue
+  af6e260bdfd2a953 2-4,23-42,69-71,78-98,153-157,167-183
+backend/app/routers/auth.py
+  af6e260bdfd2a953 10-12,60-78
+backend/app/schemas.py
+  af6e260bdfd2a953 29-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "cecfcdd3c7ec5980f2806567957888c1f0251394",
+  "prompts": {
+    "af6e260bdfd2a953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17098-ae3f-7d22-8e25-2d372e6a64ba",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 412,
+      "total_deletions": 55,
+      "accepted_lines": 961,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/38292d6d93cf288078a0736b5e132d1248e7d83ffc5d9e70cc80aa3082fde03c"
+    }
+  }
+}
