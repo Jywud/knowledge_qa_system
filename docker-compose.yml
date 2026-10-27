@@ -26,9 +26,13 @@ services:
       CHUNK_SIZE: ${CHUNK_SIZE:-800}
       CHUNK_OVERLAP: ${CHUNK_OVERLAP:-100}
       TOP_K: ${TOP_K:-5}
+      EMBED_PROVIDER: ${EMBED_PROVIDER:-ollama}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       EMBED_MODEL: ${EMBED_MODEL:-bge-m3}
       EMBED_DIM: ${EMBED_DIM:-1024}
+      EMBED_OPENAI_BASE_URL: ${EMBED_OPENAI_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
+      EMBED_OPENAI_API_KEY: ${EMBED_OPENAI_API_KEY:-}
+      EMBED_OPENAI_DIMENSIONS: ${EMBED_OPENAI_DIMENSIONS:-1024}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://ark.cn-beijing.volces.com/api/coding/v3}
       LLM_API_KEY: ${LLM_API_KEY}
       LLM_MODEL: ${LLM_MODEL:-deepseek-v4.1-flash}

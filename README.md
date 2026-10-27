@@ -12,7 +12,7 @@
 - **文件管理**：支持 `md` / `txt` / `docx` / `pdf`；管理员可在指定知识库内一次最多上传 10 个文件，解析、切分和向量化在后台执行，状态为“处理中 / 就绪 / 失败”。
 - **智能问答**：选择知识库后提问，支持流式输出、多轮上下文记忆、会话列表和历史记录恢复；知识库未命中内容时如实说明，不编造答案。
 - **混合检索**：pgvector 向量检索 + LangChain Community `BM25Retriever` 关键词检索，通过 RRF 融合排序。
-- **性能与上下文**：启动时为 `chunks.embedding` 创建 HNSW 余弦相似度索引；发送给大模型的最近历史消息默认限制为 20 条。
+- **性能与上下文**：启动时为 `chunks.embedding` 创建 HNSW 余弦相似度索引；发送给大模型的最近历史消息默认限制为 20 条；超过 30 条后自动将旧消息压缩为摘要，与最近 20 条一起传给大模型。
 - **系统设置**：管理员可配置分块大小、重叠窗口和 TopK。
 - **安全**：登录防暴力破解（连续失败锁定）；敏感操作审计日志落库。
 - **自动化测试**：覆盖登录、用户管理、文件上传核心链路。
@@ -63,7 +63,7 @@ docs/                     # 需求、设计和专项方案
 1. Python 3.13
 2. Node.js / npm
 3. Docker 运行中的 PostgreSQL
-4. Ollama，并已拉取 `bge-m3`
+4. Embedding 服务：默认使用 Ollama，并已拉取 `EMBED_MODEL`（默认 `bge-m3`）；也可改用 OpenAI 兼容在线模型
 5. 大模型 API Key（OpenAI 兼容协议）
 
 ## 启动步骤
@@ -126,7 +126,9 @@ npm run dev
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | 分块参数默认值 |
 | `TOP_K` | TopK 默认值 |
 | `RETRIEVAL_MIN_SCORE` | 向量相似度阈值（默认 `0.5`，越低越宽松） |
-| `MAX_HISTORY_MESSAGES` | 发送给大模型的最近历史消息数（默认 `20`） |
+| MAX_HISTORY_MESSAGES | 发送给大模型的最近历史消息数（默认 20） |
+| SUMMARY_TRIGGER_MESSAGES | 总消息数达到此值后触发摘要（默认 30） |
+| SUMMARY_BATCH_SIZE | 每次摘要处理的旧消息条数（默认 10） |
 | `EMBED_PROVIDER` | Embedding 供应商：`ollama` 或 `openai` |
 | `OLLAMA_BASE_URL` / `EMBED_MODEL` | 本地 Embedding 服务和模型 |
 | `EMBED_OPENAI_BASE_URL` / `EMBED_OPENAI_API_KEY` | OpenAI 兼容在线 Embedding 地址和密钥 |
@@ -175,6 +177,7 @@ cd backend
 - [`docs/docx切分优化设计.md`](docs/docx切分优化设计.md)
 - [`docs/pgvector迁移设计.md`](docs/pgvector迁移设计.md)
 - [`docs/登录防暴力破解设计.md`](docs/登录防暴力破解设计.md)
-- [`docs/审计日志与自动化测试设计.md`](docs/审计日志与自动化测试设计.md)
+- [docs/审计日志与自动化测试设计.md](docs/审计日志与自动化测试设计.md)
+- [docs/对话上下文摘要策略设计.md](docs/对话上下文摘要策略设计.md)
 
 后续以这些文档作为需求与实现对齐基线。

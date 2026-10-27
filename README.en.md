@@ -12,7 +12,7 @@ A full-stack enterprise knowledge base QA system with account authentication, mu
 - **File management**: supports `md`, `txt`, `docx`, and `pdf`. Admins can upload up to 10 files at a time to a selected knowledge base. Parsing, chunking, and embedding run in the background with statuses `processing`, `ready`, or `failed`.
 - **AI Q&A**: users select a knowledge base before asking questions. Responses stream token by token, preserve multi-turn context, and honestly state when the knowledge base has no relevant content instead of making up answers.
 - **Hybrid retrieval**: pgvector semantic search combined with LangChain Community `BM25Retriever` keyword search, fused with Reciprocal Rank Fusion (RRF).
-- **Performance and context**: an HNSW cosine similarity index is created for `chunks.embedding` at startup. The recent conversation history sent to the LLM is limited to 20 messages by default.
+- **Performance and context**: an HNSW cosine similarity index is created for `chunks.embedding` at startup. The recent conversation history sent to the LLM is limited to 20 messages by default. When total messages exceed 30, older messages are automatically compressed into a summary and combined with the recent 20 for the LLM.
 - **System settings**: admins can configure chunk size, chunk overlap, and TopK.
 - **Security**: login lockout protects against brute-force attempts. Sensitive operations are written to the audit log.
 - **Automated tests**: core flows cover login, user management, file upload, and docx-aware splitting. Optional retrieval regression cases are also available.
@@ -63,7 +63,7 @@ docs/                     # Chinese requirements and design documents
 1. Python 3.13
 2. Node.js / npm
 3. Docker running PostgreSQL
-4. Ollama with `bge-m3` pulled, unless using an online embedding provider
+4. An embedding service: Ollama with `EMBED_MODEL` pulled by default (`bge-m3`), or an OpenAI-compatible online embedding provider
 5. An OpenAI-compatible LLM API key
 
 ## Local Development
@@ -126,7 +126,9 @@ Important variables in `backend/.env`:
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | Default chunking parameters |
 | `TOP_K` | Default number of retrieved chunks |
 | `RETRIEVAL_MIN_SCORE` | Vector similarity threshold; default `0.5`, lower means looser |
-| `MAX_HISTORY_MESSAGES` | Recent messages sent to the LLM; default `20` |
+| MAX_HISTORY_MESSAGES | Recent messages sent to the LLM; default 20 |
+| SUMMARY_TRIGGER_MESSAGES | Message count threshold to trigger summarization; default 30 |
+| SUMMARY_BATCH_SIZE | Number of old messages per summarization batch; default 10 |
 | `EMBED_PROVIDER` | Embedding provider: `ollama` or `openai` |
 | `OLLAMA_BASE_URL` / `EMBED_MODEL` | Local embedding service and model |
 | `EMBED_OPENAI_BASE_URL` / `EMBED_OPENAI_API_KEY` | OpenAI-compatible online embedding endpoint and API key |
@@ -177,6 +179,7 @@ The design documents are maintained in Chinese:
 - [`docs/docx切分优化设计.md`](docs/docx切分优化设计.md)
 - [`docs/pgvector迁移设计.md`](docs/pgvector迁移设计.md)
 - [`docs/登录防暴力破解设计.md`](docs/登录防暴力破解设计.md)
-- [`docs/审计日志与自动化测试设计.md`](docs/审计日志与自动化测试设计.md)
+- [docs/审计日志与自动化测试设计.md](docs/审计日志与自动化测试设计.md)
+- [docs/对话上下文摘要策略设计.md](docs/对话上下文摘要策略设计.md)
 
 These documents are the baseline for requirements and implementation alignment.
