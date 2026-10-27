@@ -1,4 +1,6 @@
 .venv/
+backend/run.log
+backend/run.err.log
 node_modules/
 __pycache__/
 *.pyc

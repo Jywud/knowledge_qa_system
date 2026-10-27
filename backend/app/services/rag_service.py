@@ -76,7 +76,9 @@ def make_chat_node(llm: ChatOpenAI):
         if not docs:
             context = "（知识库中暂无相关内容）"
         system = SystemMessage(content=RAG_SYSTEM_PROMPT.format(context=context))
-        response = await llm.ainvoke([system, *state["messages"]])
+        max_history = settings.max_history_messages
+        history = state["messages"][-max_history:] if max_history > 0 else state["messages"]
+        response = await llm.ainvoke([system, *history])
         return {"messages": [response], "sources": sources}
 
     return chat_node

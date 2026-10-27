@@ -106,11 +106,6 @@ async def hybrid_search(query: str, kb_id: int | None, top_k: int) -> list[Docum
     from app.database import SessionLocal
 
     candidate_k = max(top_k * 2, 10)
-    query_vector = await get_embeddings().aembed_query(query)
-    vector_docs = await _vector_search(query_vector, kb_id, candidate_k)
-    if not vector_docs:
-        return []
-
     async with SessionLocal() as db:
         sql_statement = (
             select(
@@ -132,6 +127,16 @@ async def hybrid_search(query: str, kb_id: int | None, top_k: int) -> list[Docum
             sql_statement = sql_statement.where(FileRecord.kb_id == kb_id)
         result = await db.execute(sql_statement)
         rows = result.all()
+
+    try:
+        query_vector = await get_embeddings().aembed_query(query)
+        vector_docs = await _vector_search(query_vector, kb_id, candidate_k)
+    except Exception:
+        vector_docs = None
+    if vector_docs is None:
+        return _bm25_search(query, rows, top_k)
+    if not vector_docs:
+        return []
 
     keyword_docs = _bm25_search(query, rows, candidate_k)
     return _merge_candidates(vector_docs, keyword_docs, top_k)

@@ -29,6 +29,12 @@ async def lifespan(app: FastAPI):
             )
         )
         await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_chunks_embedding_hnsw "
+                "ON chunks USING hnsw (embedding vector_cosine_ops)"
+            )
+        )
+        await conn.execute(
             text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(16) DEFAULT 'user'")
         )
         await conn.execute(

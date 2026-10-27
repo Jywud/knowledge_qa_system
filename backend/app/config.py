@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     top_k: int = 5
     embed_dim: int = 1024
     retrieval_min_score: float = 0.5
+    max_history_messages: int = 20
 
     ollama_base_url: str = "http://localhost:11434"
     embed_model: str = "bge-m3"

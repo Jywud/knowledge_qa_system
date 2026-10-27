@@ -6,9 +6,10 @@
 
 - **登录与用户管理**：账号密码登录，JWT 鉴权；管理员可新增用户、重置密码、删除用户。
 - **多知识库**：管理员创建 / 编辑 / 删除知识库，用户可查看知识库列表与统计。
-- **文件管理**：支持 `md` / `txt` / `docx` / `pdf`；管理员可在指定知识库内上传、更新、删除文件并查看分块。
-- **智能问答**：选择知识库后提问，支持流式输出、多轮上下文记忆、会话列表和历史记录恢复。
+- **文件管理**：支持 `md` / `txt` / `docx` / `pdf`；管理员可在指定知识库内一次最多上传 10 个文件，解析、切分和向量化在后台执行，状态为“处理中 / 就绪 / 失败”。
+- **智能问答**：选择知识库后提问，支持流式输出、多轮上下文记忆、会话列表和历史记录恢复；知识库未命中内容时如实说明，不编造答案。
 - **混合检索**：pgvector 向量检索 + LangChain Community `BM25Retriever` 关键词检索，通过 RRF 融合排序。
+- **性能与上下文**：启动时为 `chunks.embedding` 创建 HNSW 余弦相似度索引；发送给大模型的最近历史消息默认限制为 20 条。
 - **系统设置**：管理员可配置分块大小、重叠窗口和 TopK。
 - **安全**：登录防暴力破解（连续失败锁定）；敏感操作审计日志落库。
 - **自动化测试**：覆盖登录、用户管理、文件上传核心链路。
@@ -39,8 +40,8 @@ backend/
     auth.py               # JWT、密码哈希、当前用户和管理员依赖
     routers/              # auth / users / knowledge-bases / files / chat / settings
     services/
-      document_service.py # 文档解析、分块、向量化、删除向量
-      retrieval_service.py# 向量 + BM25 混合检索
+      document_service.py # 文档解析、分块、向量化、状态回写
+      retrieval_service.py# 向量 + BM25 混合检索，向量异常时降级 BM25
       rag_service.py      # LangGraph RAG 编排
       settings_service.py # 运行时系统设置
   requirements.txt
@@ -121,6 +122,8 @@ npm run dev
 | `UPLOAD_DIR` / `EMBED_DIM` | 上传文件目录、向量维度（默认 1024，对应 bge-m3） |
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | 分块参数默认值 |
 | `TOP_K` | TopK 默认值 |
+| `RETRIEVAL_MIN_SCORE` | 向量相似度阈值（默认 `0.5`，越低越宽松） |
+| `MAX_HISTORY_MESSAGES` | 发送给大模型的最近历史消息数（默认 `20`） |
 | `OLLAMA_BASE_URL` / `EMBED_MODEL` | 本地 Embedding 服务和模型 |
 | `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | 大模型接口配置（OpenAI 兼容协议） |
 | `JWT_SECRET` / `JWT_EXPIRE_HOURS` | JWT 签发配置 |
@@ -149,7 +152,7 @@ cd backend
 
 1. 使用 `admin / 123456` 登录。
 2. 进入「知识库」，创建或选择知识库。
-3. 在知识库内上传文件，等待解析和向量化完成。
+3. 在知识库内上传文件（单次最多 10 个），等待状态从“处理中”变为“就绪”。
 4. 进入「对话」，选择知识库后提问。
 5. 首条消息发送后会自动生成会话；左侧列表可继续会话或删除会话。
 6. 管理员可在右上角进入「系统设置」，调整检索与分块参数。
@@ -159,6 +162,10 @@ cd backend
 - [`docs/需求文档.md`](docs/需求文档.md)
 - [`docs/设计文档.md`](docs/设计文档.md)
 - [`docs/检索优化需求与设计.md`](docs/检索优化需求与设计.md)
+- [`docs/关键词检索优化设计.md`](docs/关键词检索优化设计.md)
+- [`docs/异步向量化设计.md`](docs/异步向量化设计.md)
+- [`docs/docx切分优化设计.md`](docs/docx切分优化设计.md)
+- [`docs/pgvector迁移设计.md`](docs/pgvector迁移设计.md)
 - [`docs/登录防暴力破解设计.md`](docs/登录防暴力破解设计.md)
 - [`docs/审计日志与自动化测试设计.md`](docs/审计日志与自动化测试设计.md)
 
