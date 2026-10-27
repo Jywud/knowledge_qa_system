@@ -27,12 +27,12 @@ class ChatState(TypedDict):
 
 
 def build_llm() -> ChatOpenAI:
-    if not settings.ark_api_key:
-        raise RuntimeError("ARK_API_KEY 未配置，请在 backend/.env 中填写")
+    if not settings.llm_api_key:
+        raise RuntimeError("LLM_API_KEY 未配置，请在 backend/.env 中填写")
     return ChatOpenAI(
-        model=settings.ark_model,
-        api_key=settings.ark_api_key,
-        base_url=settings.ark_base_url,
+        model=settings.llm_model,
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
         streaming=True,
         temperature=0.3,
     )

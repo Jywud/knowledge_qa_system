@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://localhost:11434"
     embed_model: str = "bge-m3"
 
-    ark_base_url: str = "https://ark.cn-beijing.volces.com/api/coding/v3"
-    ark_api_key: str = ""
-    ark_model: str = "deepseek-v4.1-flash"
+    llm_base_url: str = "https://ark.cn-beijing.volces.com/api/coding/v3"
+    llm_api_key: str = ""
+    llm_model: str = "deepseek-v4.1-flash"
 
     jwt_secret: str = "change-me-in-production"
     jwt_expire_hours: int = 24

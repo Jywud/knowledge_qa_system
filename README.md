@@ -25,7 +25,7 @@
 | 向量库 | ChromaDB（本地持久化） |
 | 关系库 | PostgreSQL（本地 Docker） |
 | Embedding | Ollama `bge-m3` |
-| 对话模型 | 火山方舟 Ark，OpenAI 兼容协议 |
+| 对话模型 | OpenAI 兼容协议（默认火山方舟，可替换其他供应商） |
 | 对话记忆 | LangGraph Postgres Checkpoint |
 
 ## 项目结构
@@ -60,7 +60,7 @@ docs/                     # 需求、设计和专项方案
 2. Node.js / npm
 3. Docker 运行中的 PostgreSQL
 4. Ollama，并已拉取 `bge-m3`
-5. 火山方舟 API Key
+5. 大模型 API Key（OpenAI 兼容协议）
 
 ## 启动步骤
 
@@ -82,7 +82,7 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-编辑 `backend/.env`，至少填写 `DATABASE_URL` 和 `ARK_API_KEY`。
+编辑 `backend/.env`，至少填写 `DATABASE_URL` 和 `LLM_API_KEY`。
 
 ### 3. 启动后端
 
@@ -122,7 +122,7 @@ npm run dev
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | 分块参数默认值 |
 | `TOP_K` | TopK 默认值 |
 | `OLLAMA_BASE_URL` / `EMBED_MODEL` | 本地 Embedding 服务和模型 |
-| `ARK_BASE_URL` / `ARK_API_KEY` / `ARK_MODEL` | 对话模型接口配置 |
+| `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | 大模型接口配置（OpenAI 兼容协议） |
 | `JWT_SECRET` / `JWT_EXPIRE_HOURS` | JWT 签发配置 |
 | `LOGIN_MAX_ATTEMPTS` / `LOGIN_LOCK_MINUTES` | 登录防暴力破解配置 |
 
@@ -130,7 +130,7 @@ npm run dev
 
 ## Docker 部署
 
-在项目根目录创建 `.env`（参考 `backend/.env.example`），至少填写 `JWT_SECRET` 和 `ARK_API_KEY`，然后：
+在项目根目录创建 `.env`（参考 `backend/.env.example`），至少填写 `JWT_SECRET` 和 `LLM_API_KEY`，然后：
 
 ```bash
 docker compose up -d --build
