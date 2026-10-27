@@ -1,0 +1,34 @@
+README.md
+  af6e260bdfd2a953 28,127,129-130,137
+backend/tests/test_embeddings.py
+  af6e260bdfd2a953 1-15
+docs/在线向量模型配置设计.md
+  af6e260bdfd2a953 1-44
+backend/.env.example
+  af6e260bdfd2a953 11-16
+backend/app/services/document_service.py
+  af6e260bdfd2a953 13,25-40
+backend/app/config.py
+  af6e260bdfd2a953 22-25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "51d145a0ce136b1aa92918c6f7796d09deaaa9ad",
+  "prompts": {
+    "af6e260bdfd2a953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17098-ae3f-7d22-8e25-2d372e6a64ba",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 92,
+      "total_deletions": 2,
+      "accepted_lines": 671,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/174df5f239d122ef23271fa2215313102fea38863a88dbe54369ebb719d35685"
+    }
+  }
+}
