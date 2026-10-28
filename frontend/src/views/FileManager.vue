@@ -186,7 +186,7 @@ const STATUS_META = {
         <el-table-column prop="created_at" label="上传时间" width="170">
           <template #default="{ row }">{{ new Date(row.created_at).toLocaleString() }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="190" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button
               link
@@ -201,7 +201,7 @@ const STATUS_META = {
               :show-file-list="false"
               :http-request="(opt) => updateFile(opt, row)"
               accept=".md,.docx,.pdf,.txt"
-              style="display: inline-block; margin: 0 8px"
+              style="display: inline-block; margin: 0 8px; white-space: nowrap; vertical-align: middle"
             >
               <el-button
                 link
