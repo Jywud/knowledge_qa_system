@@ -46,7 +46,7 @@ onMounted(async () => {
     <div class="background"></div>
     <div class="pattern"></div>
     <header class="topbar">
-      <div class="brand">✦ 企业知识库</div>
+      <div class="brand">✦ 企业智能知识库系统</div>
       <div class="topbar-actions">
         <button class="top-link" type="button" @click="goChat"><el-icon><ChatDotRound /></el-icon>对话问答</button>
         <button class="top-link" type="button" @click="goKnowledgeBases"><el-icon><Collection /></el-icon>知识库</button>

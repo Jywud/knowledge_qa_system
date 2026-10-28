@@ -35,7 +35,7 @@ async function removeConversation(conv) {
 
 <template>
   <div class="sidebar">
-    <div class="logo" title="回到首页" @click="goHome">企业知识库</div>
+    <div class="logo" title="回到首页" @click="goHome">企业智能知识库系统</div>
 
     <div v-if="user" class="conv-section">
       <div class="conv-header">

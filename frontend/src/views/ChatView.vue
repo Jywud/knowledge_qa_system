@@ -158,10 +158,10 @@ async function send() {
   <div class="chat-layout">
     <div class="chat-area">
       <div ref="msgListRef" class="msg-list">
-        <el-empty
-          v-if="!messages.length"
-          :description="currentConversationId ? '暂无消息，输入问题开始对话' : '输入问题即可开始对话'"
-        />
+        <div v-if="!messages.length" class="chat-welcome">
+          <h2 class="welcome-title">有什么可以帮您？</h2>
+          <p class="welcome-desc">{{ currentConversationId ? '输入问题，AI 将基于所选知识库为您解答' : '选择上方知识库后输入问题，AI 将基于文档内容为您解答' }}</p>
+        </div>
         <div
           v-for="(msg, i) in messages"
           :key="i"
@@ -459,4 +459,28 @@ async function send() {
   }
 }
 
+
+.chat-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 24px 40px;
+  text-align: center;
+}
+.welcome-title {
+  margin: 0 0 12px;
+  font-size: 28px;
+  font-weight: 700;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.welcome-desc {
+  margin: 0;
+  font-size: 15px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
 </style>

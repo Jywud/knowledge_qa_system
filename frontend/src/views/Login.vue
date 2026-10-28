@@ -34,7 +34,7 @@ async function submit() {
 <template>
   <div class="login-page">
     <div class="login-card">
-      <h2 class="title">企业知识库问答系统</h2>
+      <h2 class="title">企业智能知识库系统</h2>
       <p class="subtitle">请使用账号密码登录</p>
       <el-form ref="formRef" :model="form" :rules="rules" size="large" @keyup.enter="submit">
         <el-form-item prop="username">
