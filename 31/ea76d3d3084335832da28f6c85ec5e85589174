@@ -1,0 +1,22 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "31ea76d3d3084335832da28f6c85ec5e85589174",
+  "prompts": {
+    "af6e260bdfd2a953": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a17098-ae3f-7d22-8e25-2d372e6a64ba",
+        "model": "glm-5.3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 301,
+      "total_deletions": 1,
+      "accepted_lines": 1501,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/65596311bc747c30a56547c9bd34aa3721d8197b75e14ebc556833bbecb49eba"
+    }
+  }
+}
