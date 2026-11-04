@@ -12,7 +12,7 @@ from app.database import SessionLocal, get_db
 from app.auth import get_current_user
 from app.models import Chunk, Conversation, FileRecord, Message, User
 from app.schemas import ChatRequest, ConversationCreate, ConversationOut, MessageOut
-from app.services.rag_service import extract_text
+from app.services.rag_service import extract_text, generate_title
 from app.services.settings_service import get_system_settings
 
 router = APIRouter(prefix="/api/conversations", tags=["chat"])
@@ -102,7 +102,8 @@ async def chat(
     conv = await db.get(Conversation, conversation_id)
     if not conv or conv.user_id != user.id:
         raise HTTPException(404, "会话不存在")
-    if not conv.title:
+    is_first_message = not conv.title
+    if is_first_message:
         conv.title = body.content[:20]
     if conv.kb_id is None and body.kb_id:
         conv.kb_id = body.kb_id
@@ -114,8 +115,22 @@ async def chat(
     user_msg = HumanMessage(content=body.content)
     system_settings = await get_system_settings(db)
 
+    async def generate_and_save_title():
+        try:
+            title = await generate_title(body.content)
+            async with SessionLocal() as title_db:
+                title_conv = await title_db.get(Conversation, conversation_id)
+                if title_conv:
+                    title_conv.title = title
+                    await title_db.commit()
+        except Exception:
+            pass
+
     async def run_generation(queue: asyncio.Queue):
         full_text = ""
+        title_task = (
+            asyncio.create_task(generate_and_save_title()) if is_first_message else None
+        )
         try:
             await queue.put({"type": "start"})
             async for chunk, _metadata in graph.astream(
@@ -178,6 +193,11 @@ async def chat(
         except Exception as exc:
             await queue.put({"type": "error", "message": str(exc)})
         finally:
+            if title_task:
+                try:
+                    await asyncio.wait_for(title_task, timeout=8)
+                except Exception:
+                    pass
             await queue.put({"type": "done"})
 
     queue: asyncio.Queue = asyncio.Queue()

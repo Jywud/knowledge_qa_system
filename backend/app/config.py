@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     max_history_messages: int = 20
     summary_trigger_messages: int = 30
     summary_batch_size: int = 10
+    max_upload_mb: int = 50
 
     ollama_base_url: str = "http://localhost:11434"
     embed_model: str = "bge-m3"

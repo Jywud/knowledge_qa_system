@@ -26,6 +26,27 @@ def _upload_dir() -> Path:
     return path
 
 
+def _safe_filename(filename: str | None) -> str:
+    raw = (filename or "").replace("\\", "/").split("/")[-1].strip()
+    cleaned = "".join(ch for ch in raw if ch.isprintable() and ch not in ':*?"<>|')
+    cleaned = cleaned.strip(". ") or "unnamed"
+    return cleaned[:128]
+
+
+async def _save_upload(file: UploadFile, dest: Path) -> int:
+    limit = settings.max_upload_mb * 1024 * 1024
+    total = 0
+    async with aiofiles.open(dest, "wb") as out:
+        while chunk := await file.read(1024 * 1024):
+            total += len(chunk)
+            if total > limit:
+                await out.close()
+                dest.unlink(missing_ok=True)
+                raise HTTPException(413, f"文件大小超过限制（{settings.max_upload_mb} MB）")
+            await out.write(chunk)
+    return total
+
+
 def _file_out(record: FileRecord, chunk_count: int, uploader: str = "") -> FileOut:
     return FileOut(
         id=record.id,
@@ -53,13 +74,14 @@ async def upload_file(
     kb = await db.get(KnowledgeBase, kb_id)
     if not kb:
         raise HTTPException(404, "知识库不存在")
-    suffix = Path(file.filename).suffix.lstrip(".").lower()
+    filename = _safe_filename(file.filename)
+    suffix = Path(filename).suffix.lstrip(".").lower()
     if suffix not in SUPPORTED_TYPES:
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 md/docx/pdf/txt")
 
     record = FileRecord(
         kb_id=kb_id,
-        filename=file.filename,
+        filename=filename,
         file_type=suffix,
         status="processing",
         uploaded_by=admin.id,
@@ -67,17 +89,14 @@ async def upload_file(
     db.add(record)
     await db.flush()
 
-    save_path = _upload_dir() / f"{record.id}_{file.filename}"
-    async with aiofiles.open(save_path, "wb") as out:
-        content = await file.read()
-        await out.write(content)
-    record.size = len(content)
+    save_path = _upload_dir() / f"{record.id}_{filename}"
+    record.size = await _save_upload(file, save_path)
 
-    await log_audit(db, admin, "file.upload", target=file.filename)
+    await log_audit(db, admin, "file.upload", target=filename)
     await db.commit()
     await db.refresh(record)
     background_tasks.add_task(
-        process_file_record, record.id, save_path, suffix, file.filename, kb_id
+        process_file_record, record.id, save_path, suffix, filename, kb_id
     )
     return _file_out(record, 0, admin.username)
 
@@ -126,27 +145,26 @@ async def update_file(
         raise HTTPException(404, "文件不存在")
     if record.status == "processing":
         raise HTTPException(409, "文件正在后台处理中，请稍后再试")
-    suffix = Path(file.filename).suffix.lstrip(".").lower()
+    filename = _safe_filename(file.filename)
+    suffix = Path(filename).suffix.lstrip(".").lower()
     if suffix not in SUPPORTED_TYPES:
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 md/docx/pdf/txt")
 
     await delete_file_vectors(db, file_id)
 
-    save_path = _upload_dir() / f"{file_id}_{file.filename}"
-    async with aiofiles.open(save_path, "wb") as out:
-        content = await file.read()
-        await out.write(content)
+    save_path = _upload_dir() / f"{file_id}_{filename}"
+    size = await _save_upload(file, save_path)
 
-    record.filename = file.filename
+    record.filename = filename
     record.file_type = suffix
-    record.size = len(content)
+    record.size = size
     record.version += 1
     record.status = "processing"
     record.status_message = None
     await db.commit()
     await db.refresh(record)
     background_tasks.add_task(
-        process_file_record, file_id, save_path, suffix, file.filename, record.kb_id
+        process_file_record, file_id, save_path, suffix, filename, record.kb_id
     )
     return _file_out(record, 0, admin.username)
 

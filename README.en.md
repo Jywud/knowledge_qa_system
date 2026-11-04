@@ -10,7 +10,7 @@ A full-stack enterprise knowledge base QA system with account authentication, mu
 - **Personal security**: logged-in users can change their own password from the top-right menu. The operation is recorded in the audit log.
 - **Multi-knowledge-base support**: admins can create, edit, and delete knowledge bases. All logged-in users can view the knowledge base list and statistics.
 - **File management**: supports `md`, `txt`, `docx`, and `pdf`. Admins can upload up to 10 files at a time to a selected knowledge base. Parsing, chunking, and embedding run in the background with statuses `processing`, `ready`, or `failed`.
-- **AI Q&A**: users select a knowledge base before asking questions. Responses stream token by token, preserve multi-turn context, and honestly state when the knowledge base has no relevant content instead of making up answers.
+- **AI Q&A**: users select a knowledge base before asking questions. Responses stream token by token, preserve multi-turn context, auto-generate a concise conversation title after the first answer, and honestly state when the knowledge base has no relevant content instead of making up answers.
 - **Hybrid retrieval**: pgvector semantic search combined with LangChain Community `BM25Retriever` keyword search, fused with Reciprocal Rank Fusion (RRF).
 - **Performance and context**: an HNSW cosine similarity index is created for `chunks.embedding` at startup. The recent conversation history sent to the LLM is limited to 20 messages by default. When total messages exceed 30, older messages are automatically compressed into a summary and combined with the recent 20 for the LLM.
 - **System settings**: admins can configure chunk size, chunk overlap, and TopK.
@@ -129,6 +129,7 @@ Important variables in `backend/.env`:
 | MAX_HISTORY_MESSAGES | Recent messages sent to the LLM; default 20 |
 | SUMMARY_TRIGGER_MESSAGES | Message count threshold to trigger summarization; default 30 |
 | SUMMARY_BATCH_SIZE | Number of old messages per summarization batch; default 10 |
+| MAX_UPLOAD_MB | Maximum size of a single uploaded file in MB; default 50 |
 | `EMBED_PROVIDER` | Embedding provider: `ollama` or `openai` |
 | `OLLAMA_BASE_URL` / `EMBED_MODEL` | Local embedding service and model |
 | `EMBED_OPENAI_BASE_URL` / `EMBED_OPENAI_API_KEY` | OpenAI-compatible online embedding endpoint and API key |

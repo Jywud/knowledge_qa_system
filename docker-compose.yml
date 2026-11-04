@@ -26,6 +26,7 @@ services:
       CHUNK_SIZE: ${CHUNK_SIZE:-800}
       CHUNK_OVERLAP: ${CHUNK_OVERLAP:-100}
       TOP_K: ${TOP_K:-5}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
       EMBED_PROVIDER: ${EMBED_PROVIDER:-ollama}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       EMBED_MODEL: ${EMBED_MODEL:-bge-m3}

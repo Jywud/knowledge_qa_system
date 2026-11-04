@@ -33,6 +33,11 @@ SUMMARY_PROMPT = """请将以下对话压缩为一段简洁摘要（不超过200
 
 请直接输出摘要内容，不要加任何前缀或解释。"""
 
+TITLE_PROMPT = """请根据用户的第一条问题，生成一个不超过 20 个字的简短会话标题。
+只输出标题本身，不要引号、标点或解释。
+
+用户问题：{content}"""
+
 
 class ChatState(TypedDict):
     messages: Annotated[list, add_messages]
@@ -79,6 +84,16 @@ def extract_text(content: Any) -> str:
                 parts.append(item)
         return "".join(parts)
     return str(content or "")
+
+
+async def generate_title(content: str) -> str:
+    llm = build_summary_llm()
+    result = await llm.ainvoke(
+        [SystemMessage(content=TITLE_PROMPT.format(content=content[:500]))]
+    )
+    title = extract_text(result.content).strip().strip('"\'“”‘’').strip()
+    title = " ".join(title.split())
+    return title[:30] or content[:20]
 
 
 def make_summarize_node(summary_llm: ChatOpenAI):
