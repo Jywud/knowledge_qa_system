@@ -100,11 +100,22 @@ async function changePassword() {
 
 <template>
   <el-container class="layout">
-    <el-aside width="220px">
+    <el-aside v-if="isChat" width="220px">
       <AppSidebar />
     </el-aside>
     <el-container>
       <el-header class="header">
+        <div class="header-left">
+          <button v-if="!isChat" class="header-brand" @click="router.push('/home')">
+            <span class="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 32 32" width="14" height="14" fill="none">
+                <path d="M16 3.5 27 9.75v12.5L16 28.5 5 22.25V9.75L16 3.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <path d="M16 10.5v11M11 13.5l10 5M21 13.5l-10 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span>企业智能知识库系统</span>
+          </button>
+        </div>
         <div class="header-actions">
           <el-tooltip
             v-if="isChat && kbLocked"
@@ -192,11 +203,47 @@ async function changePassword() {
 .header {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   padding: 0 24px;
   border-bottom: 1px solid var(--color-border);
   background: rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(18px);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.header-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.header-brand:hover {
+  background: var(--color-surface-muted);
+}
+
+.header-brand .brand-mark {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--gradient-primary);
 }
 
 .header-actions {

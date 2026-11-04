@@ -96,7 +96,9 @@ onMounted(load);
       <el-button v-if="isAdmin()" type="primary" :icon="Plus" @click="openCreate">创建知识库</el-button>
     </div>
 
-    <el-empty v-if="!knowledgeBases.length" description="暂无知识库" />
+    <el-empty v-if="!knowledgeBases.length" :description="isAdmin() ? '还没有知识库，创建一个开始使用' : '还没有知识库，请联系管理员创建'">
+      <el-button v-if="isAdmin()" type="primary" :icon="Plus" @click="openCreate">创建知识库</el-button>
+    </el-empty>
     <div v-else class="cards">
       <el-card v-for="kb in knowledgeBases" :key="kb.id" class="kb-card" shadow="hover">
         <div class="kb-head">

@@ -1,11 +1,12 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { Delete, RefreshRight, Upload, View } from "@element-plus/icons-vue";
+import { ArrowLeft, Delete, Folder, RefreshRight, Upload, View } from "@element-plus/icons-vue";
 import { api, knowledgeBases, loadKnowledgeBases, user } from "../store";
 
 const route = useRoute();
+const router = useRouter();
 const files = ref([]);
 const uploadRef = ref(null);
 let pendingUploads = 0;
@@ -17,6 +18,9 @@ const currentFile = ref(null);
 const expandedChunks = ref({});
 
 const isAdmin = computed(() => user.value?.role === "admin");
+const currentKbName = computed(
+  () => knowledgeBases.value.find((kb) => kb.id === selectedKb.value)?.name ?? "文件管理"
+);
 
 function formatSize(size) {
   if (size < 1024) return size + " B";
@@ -120,6 +124,13 @@ const STATUS_META = {
 
 <template>
   <div class="file-manager">
+    <nav class="breadcrumb">
+      <el-button link :icon="ArrowLeft" @click="router.push('/knowledge-bases')">
+        知识库
+      </el-button>
+      <span class="breadcrumb-sep">/</span>
+      <span class="breadcrumb-current">{{ currentKbName }}</span>
+    </nav>
     <div class="toolbar">
       <el-select
         v-model="selectedKb"
@@ -224,9 +235,32 @@ const STATUS_META = {
             </el-button>
           </template>
         </el-table-column>
+        <template #empty>
+          <div class="table-empty">
+            <el-empty
+              :description="isAdmin ? '该知识库还没有文件，上传后即可开始问答' : '该知识库还没有文件，请联系管理员上传'"
+            >
+              <el-upload
+                v-if="isAdmin"
+                :show-file-list="false"
+                :http-request="uploadFile"
+                multiple
+                :limit="10"
+                :on-exceed="() => ElMessage.warning('单次最多上传 10 个文件')"
+                accept=".md,.docx,.pdf,.txt"
+              >
+                <el-button type="primary" :icon="Upload">上传第一个文件</el-button>
+              </el-upload>
+            </el-empty>
+          </div>
+        </template>
       </el-table>
     </div>
-    <el-empty v-else description="暂无知识库，请先创建" />
+    <el-empty v-else description="暂无知识库，请先创建">
+      <el-button type="primary" :icon="Folder" @click="router.push('/knowledge-bases')">
+        去创建知识库
+      </el-button>
+    </el-empty>
 
     <el-dialog v-model="chunkDialog" :title="`分块预览 - ${currentFile?.filename}`" width="800px">
       <el-table :data="chunks" border max-height="500">
@@ -252,6 +286,23 @@ const STATUS_META = {
 <style scoped>
 .file-manager {
   padding: 20px;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.breadcrumb-sep {
+  color: var(--color-text-muted);
+}
+
+.breadcrumb-current {
+  font-weight: 600;
+  color: var(--color-text-secondary);
 }
 
 .toolbar {
@@ -296,5 +347,9 @@ const STATUS_META = {
 .file-manager :deep(.el-table th.el-table__cell) {
   color: var(--color-text-secondary);
   font-weight: 600;
+}
+
+.table-empty {
+  padding: 24px 0;
 }
 </style>

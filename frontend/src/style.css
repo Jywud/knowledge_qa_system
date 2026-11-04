@@ -29,6 +29,13 @@
   --gradient-primary: linear-gradient(135deg, var(--color-primary), var(--color-primary-strong));
   --gradient-accent: linear-gradient(100deg, var(--color-primary), var(--color-primary-strong), var(--color-primary-accent));
 
+  /* Hero / dark surface tokens */
+  --color-ink: #0a0d1f;
+  --color-ink-soft: #141a36;
+  --color-ink-text: #f4f5ff;
+  --color-ink-muted: #9aa3c7;
+  --gradient-hero: linear-gradient(158deg, #1a1240 0%, #0c1130 46%, #081124 100%);
+
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;

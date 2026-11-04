@@ -94,19 +94,19 @@ onMounted(loadSettings);
 }
 
 .page-card {
-  max-width: 680px;
+  width: 100%;
   padding: 24px;
-  border-radius: 12px;
-  background: var(--color-surface, #fff);
-  border: 1px solid var(--color-border, #e5e7eb);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-solid);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
 }
 
 .page-title {
   margin-bottom: 18px;
   font-size: 20px;
   font-weight: 700;
-  color: var(--color-text-primary, #1f2937);
+  color: var(--color-text);
 }
 
 .notice {
@@ -115,7 +115,7 @@ onMounted(loadSettings);
 
 .field-tip {
   margin-left: 12px;
-  color: var(--color-text-secondary, #64748b);
+  color: var(--color-text-secondary);
   font-size: 12px;
 }
 </style>
