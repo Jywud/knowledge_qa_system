@@ -12,6 +12,24 @@ from app.database import get_db
 from app.models import User
 
 
+def validate_username(username: str) -> str:
+    username = username.strip()
+    if not username:
+        raise HTTPException(400, "用户名不能为空")
+    if len(username) > 64:
+        raise HTTPException(400, "用户名不能超过 64 个字符")
+    return username
+
+
+def validate_new_password(password: str) -> None:
+    if len(password) < 6:
+        raise HTTPException(400, "密码至少 6 位")
+    if len(password) > 128:
+        raise HTTPException(400, "密码不能超过 128 位")
+    if not password.strip():
+        raise HTTPException(400, "密码不能全部为空白字符")
+
+
 def hash_password(password: str) -> str:
     salt = secrets.token_hex(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100_000)

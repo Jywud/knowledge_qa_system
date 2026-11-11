@@ -7,7 +7,7 @@ from app.config import settings
 from app.auth import create_token, get_current_user, verify_password
 from app.database import get_db
 from app.models import User
-from app.auth import hash_password
+from app.auth import hash_password, validate_new_password
 from app.audit import log_audit
 from app.schemas import LoginRequest, PasswordChangeRequest, UserOut
 
@@ -67,8 +67,7 @@ async def change_password(
 ):
     if not verify_password(body.old_password, user.password_hash):
         raise HTTPException(400, "原密码错误")
-    if len(body.new_password) < 6:
-        raise HTTPException(400, "新密码至少 6 位")
+    validate_new_password(body.new_password)
     if body.new_password == body.old_password:
         raise HTTPException(400, "新密码不能与原密码相同")
 

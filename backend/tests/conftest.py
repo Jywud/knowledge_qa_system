@@ -24,6 +24,7 @@ async def test_db(tmp_path, monkeypatch):
         await conn.run_sync(Base.metadata.create_all)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     monkeypatch.setattr("app.database.SessionLocal", session_factory)
+    monkeypatch.setattr("app.routers.chat.SessionLocal", session_factory)
     monkeypatch.setattr("app.config.settings.upload_dir", str(tmp_path))
 
     async def override_get_db():

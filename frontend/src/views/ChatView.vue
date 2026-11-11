@@ -3,6 +3,7 @@ import { computed, nextTick, reactive, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import MarkdownIt from "markdown-it";
 import { Promotion } from "@element-plus/icons-vue";
+import { useRouter } from "vue-router";
 import {
   api,
   conversations,
@@ -10,14 +11,17 @@ import {
   loadConversations,
   token,
   selectedKb,
+  clearAuth,
 } from "../store";
 
+const router = useRouter();
 const messages = ref([]);
 const input = ref("");
 const sending = ref(false);
 const THINKING_STEPS = ["正在检索知识库…", "正在整理相关内容…", "AI 正在思考中…"];
 const sourceDialog = reactive({ visible: false, source: "", items: [] });
 const chunkCache = {};
+let locallyCreatedConversationId = null;
 
 async function fetchChunkContent(fileId, chunkIndex) {
   if (!chunkCache[fileId]) {
@@ -56,22 +60,57 @@ function scrollBottom() {
   });
 }
 
+function requestErrorMessage(status, detail) {
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail.map((item) => item.msg).filter((msg) => typeof msg === "string");
+    if (messages.length) return messages.join("；");
+  }
+  if (status === 401) return "登录已过期，请重新登录";
+  if (status === 403) return "没有权限访问该知识库";
+  if (status === 404) return "会话或知识库不存在，请刷新后重试";
+  if (status === 429) return "请求过于频繁，请稍后重试";
+  if (status === 400 || status === 422) return "请求参数有误，请检查后重试";
+  return "服务暂不可用，请稍后重试";
+}
+
+function handleUnauthorized(message) {
+  clearAuth();
+  ElMessage.error(message);
+  router.replace("/login");
+}
+
 async function selectConversation(id) {
   if (!id) {
     messages.value = [];
     return;
   }
-  const res = await api.get(`/conversations/${id}/messages`);
-  messages.value = res.data.map((m) => ({
-    role: m.role,
-    content: m.content,
-    sources: m.sources ? JSON.parse(m.sources) : [],
-    done: true,
-  }));
-  scrollBottom();
+  messages.value = [];
+  try {
+    const res = await api.get(`/conversations/${id}/messages`);
+    if (currentConversationId.value !== id) return;
+    messages.value = res.data.map((m) => ({
+      role: m.role,
+      content: m.content,
+      sources: m.sources ? JSON.parse(m.sources) : [],
+      done: true,
+    }));
+    scrollBottom();
+  } catch (error) {
+    const message = requestErrorMessage(error.response?.status, error.response?.data?.detail);
+    if (error.response?.status === 401) handleUnauthorized(message);
+    else if (currentConversationId.value === id) ElMessage.error(message);
+  }
 }
 
-watch(currentConversationId, selectConversation, { immediate: true });
+watch(currentConversationId, (id) => {
+  // 激活刚创建的会话时保留本地回答/错误，避免空历史将它们覆盖。
+  if (id && id === locallyCreatedConversationId) {
+    locallyCreatedConversationId = null;
+    return;
+  }
+  return selectConversation(id);
+}, { immediate: true });
 
 watch(currentConversationId, (id) => {
   const conv = conversations.value.find((c) => c.id === id);
@@ -85,47 +124,54 @@ async function send() {
     return;
   }
   if (!content || sending.value || !token.value) return;
+  const kbId = selectedKb.value;
   input.value = "";
+  sending.value = true;
   let convId = currentConversationId.value;
   const isNew = !convId;
-  if (isNew) {
-    const res = await api.post("/conversations", { kb_id: selectedKb.value });
-    convId = res.data.id;
-    conversations.value.unshift(res.data);
-  }
-  messages.value.push({ role: "user", content });
-  const assistant = reactive({
-    role: "assistant",
-    content: "",
-    sources: [],
-    done: false,
-    status: THINKING_STEPS[0],
-  });
-  messages.value.push(assistant);
-  sending.value = true;
-  scrollBottom();
-  const thinkingTimer = setInterval(() => {
-    if (assistant.content) return;
-    const next = THINKING_STEPS.indexOf(assistant.status) + 1;
-    if (next < THINKING_STEPS.length) assistant.status = THINKING_STEPS[next];
-  }, 3500);
-
+  let assistant = null;
+  let thinkingTimer = null;
+  let reader = null;
   try {
+    if (isNew) {
+      const res = await api.post("/conversations", { kb_id: kbId });
+      convId = res.data.id;
+      conversations.value.unshift(res.data);
+    }
+    messages.value.push({ role: "user", content });
+    assistant = reactive({ role: "assistant", content: "", sources: [], done: false, status: THINKING_STEPS[0] });
+    messages.value.push(assistant);
+    scrollBottom();
+    thinkingTimer = setInterval(() => {
+      if (assistant.content) return;
+      const next = THINKING_STEPS.indexOf(assistant.status) + 1;
+      if (next < THINKING_STEPS.length) assistant.status = THINKING_STEPS[next];
+    }, 3500);
     const res = await fetch(`/api/conversations/${convId}/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token.value}`,
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, kb_id: kbId }),
     });
-    const reader = res.body.getReader();
+    if (!res.ok) {
+      let detail;
+      try { detail = (await res.json()).detail; } catch { /* 使用状态码兜底。 */ }
+      throw Object.assign(new Error(requestErrorMessage(res.status, detail)), { status: res.status });
+    }
+    const conv = conversations.value.find((item) => item.id === convId);
+    if (conv && !conv.kb_id) conv.kb_id = kbId;
+    if (currentConversationId.value === convId) selectedKb.value = kbId;
+    if (!res.body) throw new Error("服务返回空响应，请稍后重试");
+    reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    for (;;) {
+    let completed = false;
+    while (!completed) {
       const { done, value } = await reader.read();
       if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
       let idx;
       while ((idx = buffer.indexOf("\n\n")) >= 0) {
         const line = buffer.slice(0, idx).trim();
@@ -139,17 +185,41 @@ async function send() {
           assistant.sources = evt.sources;
         } else if (evt.type === "error") {
           assistant.content += `\n[错误] ${evt.message}`;
+        } else if (evt.type === "done") {
+          completed = true;
+          break;
         }
       }
     }
+    if (!completed) throw new Error("回答中断，请重试；已收到的内容已保留");
+    if (!assistant.content) throw new Error("未收到回答，请稍后重试");
   } catch (e) {
-    assistant.content += `\n[请求失败] ${e.message}`;
+    const status = e.status ?? e.response?.status;
+    const message = e.response ? requestErrorMessage(status, e.response.data?.detail)
+      : e.name === "TypeError" ? "网络连接失败，请检查网络后重试"
+        : e.name === "SyntaxError" ? "服务返回格式异常，请稍后重试" : e.message || "请求失败，请稍后重试";
+    if (status === 401) handleUnauthorized(message);
+    else if (assistant) assistant.content += `\n[请求失败] ${message}`;
+    else {
+      input.value = content;
+      ElMessage.error(message);
+    }
   } finally {
     clearInterval(thinkingTimer);
-    assistant.done = true;
+    if (reader) await reader.cancel().catch(() => {});
+    if (assistant) assistant.done = true;
     sending.value = false;
-    if (isNew) currentConversationId.value = convId;
-    loadConversations();
+    if (token.value && convId) {
+      if (isNew && !currentConversationId.value) {
+        locallyCreatedConversationId = convId;
+        currentConversationId.value = convId;
+      }
+      try { await loadConversations(); } catch (error) {
+        const message = requestErrorMessage(error.response?.status, error.response?.data?.detail);
+        if (error.response?.status === 401) handleUnauthorized(message);
+        else ElMessage.error("会话列表刷新失败，请稍后重试");
+      }
+    }
   }
 }
 </script>

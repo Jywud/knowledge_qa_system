@@ -4,6 +4,7 @@ import { ElMessage } from "element-plus";
 import { Collection, Lock, Setting, SwitchButton, User } from "@element-plus/icons-vue";
 import { useRouter } from "vue-router";
 import AppSidebar from "./AppSidebar.vue";
+import { newPasswordRules } from "../utils/validation";
 import {
   api,
   user,
@@ -19,16 +20,15 @@ import {
 const router = useRouter();
 
 const isChat = computed(() => router.currentRoute.value.path === "/chat");
-const kbLocked = computed(() => !!currentConversationId.value);
+const kbLocked = computed(() => Boolean(
+  conversations.value.find((conv) => conv.id === currentConversationId.value)?.kb_id
+));
 const passwordDialog = ref(false);
 const passwordFormRef = ref(null);
 const passwordForm = reactive({ oldPassword: "", newPassword: "", confirmPassword: "" });
 const passwordRules = {
   oldPassword: [{ required: true, message: "请输入原密码", trigger: "blur" }],
-  newPassword: [
-    { required: true, message: "请输入新密码", trigger: "blur" },
-    { min: 6, message: "密码至少 6 位", trigger: "blur" },
-  ],
+  newPassword: newPasswordRules,
   confirmPassword: [
     { required: true, message: "请再次输入新密码", trigger: "blur" },
     {

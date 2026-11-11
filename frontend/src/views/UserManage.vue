@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { Check, Delete, Key, Plus } from "@element-plus/icons-vue";
 import { useRouter } from "vue-router";
 import { api, clearAuth, user } from "../store";
+import { newPasswordRules, usernameRules } from "../utils/validation";
 
 const router = useRouter();
 const users = ref([]);
@@ -16,18 +17,12 @@ const formRef = ref(null);
 const resetFormRef = ref(null);
 
 const createRules = {
-  username: [{ required: true, message: "请输入用户名", trigger: "blur" }],
-  password: [
-    { required: true, message: "请输入密码", trigger: "blur" },
-    { min: 6, message: "密码至少 6 位", trigger: "blur" },
-  ],
+  username: usernameRules,
+  password: newPasswordRules,
 };
 
 const resetRules = {
-  password: [
-    { required: true, message: "请输入新密码", trigger: "blur" },
-    { min: 6, message: "密码至少 6 位", trigger: "blur" },
-  ],
+  password: newPasswordRules,
 };
 
 async function loadUsers() {
@@ -38,6 +33,7 @@ async function loadUsers() {
 async function createUser() {
   await formRef.value.validate();
   try {
+    form.username = form.username.trim();
     await api.post("/users", form);
     ElMessage.success(`用户 ${form.username} 创建成功`);
     createDialog.value = false;

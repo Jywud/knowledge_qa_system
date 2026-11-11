@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import SessionLocal, get_db
 from app.auth import get_current_user
-from app.models import Chunk, Conversation, FileRecord, Message, User
+from app.models import Chunk, Conversation, FileRecord, KnowledgeBase, Message, User
 from app.schemas import ChatRequest, ConversationCreate, ConversationOut, MessageOut
 from app.services.rag_service import extract_text, generate_title
 from app.services.settings_service import get_system_settings
@@ -20,12 +20,22 @@ router = APIRouter(prefix="/api/conversations", tags=["chat"])
 _background_tasks: set[asyncio.Task] = set()
 
 
+async def _require_knowledge_base(db: AsyncSession, kb_id: int | None) -> KnowledgeBase:
+    if kb_id is None or kb_id <= 0:
+        raise HTTPException(400, "请先选择有效的知识库")
+    kb = await db.get(KnowledgeBase, kb_id, with_for_update={"read": True, "key_share": True})
+    if not kb:
+        raise HTTPException(404, "知识库不存在")
+    return kb
+
+
 @router.post("", response_model=ConversationOut)
 async def create_conversation(
     body: ConversationCreate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await _require_knowledge_base(db, body.kb_id)
     conv = Conversation(
         user_id=user.id, title=body.title or "", kb_id=body.kb_id
     )
@@ -57,15 +67,6 @@ async def get_messages(
     conv = await db.get(Conversation, conversation_id)
     if not conv or conv.user_id != user.id:
         raise HTTPException(404, "会话不存在")
-    if conv.kb_id is None:
-        raise HTTPException(400, "会话未绑定知识库，无法问答")
-    chunk_count = await db.scalar(
-        select(func.count(Chunk.id))
-        .join(FileRecord, FileRecord.id == Chunk.file_id)
-        .where(FileRecord.kb_id == conv.kb_id)
-    )
-    if not chunk_count:
-        raise HTTPException(400, "知识库暂无可用文档，无法问答")
     result = await db.execute(
         select(Message).where(Message.conversation_id == conversation_id).order_by(Message.id)
     )
@@ -99,14 +100,27 @@ async def chat(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    conv = await db.get(Conversation, conversation_id)
+    conv = await db.get(Conversation, conversation_id, with_for_update=True)
     if not conv or conv.user_id != user.id:
         raise HTTPException(404, "会话不存在")
+    if not body.content.strip():
+        raise HTTPException(400, "问题不能为空")
+    if conv.kb_id is not None and body.kb_id is not None and body.kb_id != conv.kb_id:
+        raise HTTPException(400, "会话已绑定知识库，不能切换；请新建会话")
+    kb_id = conv.kb_id if conv.kb_id is not None else body.kb_id
+    await _require_knowledge_base(db, kb_id)
+    chunk_count = await db.scalar(
+        select(func.count(Chunk.id))
+        .join(FileRecord, FileRecord.id == Chunk.file_id)
+        .where(FileRecord.kb_id == kb_id)
+    )
+    if not chunk_count:
+        raise HTTPException(400, "知识库暂无可用文档，请先上传文档后再提问")
     is_first_message = not conv.title
     if is_first_message:
         conv.title = body.content[:20]
-    if conv.kb_id is None and body.kb_id:
-        conv.kb_id = body.kb_id
+    if conv.kb_id is None:
+        conv.kb_id = kb_id
     db.add(Message(conversation_id=conversation_id, role="user", content=body.content))
     await db.commit()
 

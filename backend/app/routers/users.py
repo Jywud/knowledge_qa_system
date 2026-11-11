@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
 
-from app.auth import get_current_user, hash_password, require_admin
+from app.auth import get_current_user, hash_password, require_admin, validate_new_password, validate_username
 from app.audit import log_audit
 from app.database import get_db
 from app.models import AuditLog, Conversation, FileRecord, KnowledgeBase, User
@@ -29,13 +29,15 @@ async def create_user(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    exists = await db.execute(select(User).where(User.username == body.username))
+    username = validate_username(body.username)
+    validate_new_password(body.password)
+    exists = await db.execute(select(User).where(User.username == username))
     if exists.scalar_one_or_none():
-        raise HTTPException(400, f"用户名 {body.username} 已存在")
+        raise HTTPException(400, f"用户名 {username} 已存在")
     if body.role not in ("admin", "user"):
         raise HTTPException(400, "角色只能是 admin 或 user")
     user = User(
-        username=body.username,
+        username=username,
         role=body.role,
         password_hash=hash_password(body.password),
     )
@@ -57,6 +59,7 @@ async def reset_password(
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(404, "用户不存在")
+    validate_new_password(body.password)
     user.password_hash = hash_password(body.password)
     await log_audit(db, admin, "user.reset_password", target=user.username)
     await db.commit()
