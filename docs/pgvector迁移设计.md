@@ -2,7 +2,7 @@
 
 ## 背景
 
-当前系统使用 ChromaDB 存储向量，chunk 元数据在 PostgreSQL、向量在 Chroma，两个存储需要手动同步（删除文件、更新文件时都要分别清理）。企业内部部署希望减少运维组件，并将向量与业务数据统一在一个数据库中管理。
+迁移前使用 ChromaDB 存储向量，chunk 元数据在 PostgreSQL，两个存储需要手动同步。当前已迁移到 pgvector，向量与业务数据在一个数据库中管理；以下方案补充了 2026-11-11 的启动异常隔离行为。
 
 ## 目标
 
@@ -51,6 +51,7 @@ ORDER BY chunks.embedding <=> CAST(:query_vector AS vector) LIMIT :k
 ### 兼容与数据迁移
 
 - 应用启动时检查 `chunks` 中 `embedding IS NULL` 且文件仍存在于上传目录的记录，按文件重新解析、切分并向量化（复用现有 ingest 逻辑）。
+- 每文件独立提交；失败回滚并保留旧块，记录日志后继续其他文件。补齐顶层异常不单独阻断应用启动，数据库与 Checkpoint 初始化仍须成功。恢复模型服务后可重启重试，尚无持久化重试队列。
 - ChromaDB 相关目录（`chroma_data/`）迁移完成后可手动删除。
 
 ## 改动范围
@@ -69,9 +70,9 @@ ORDER BY chunks.embedding <=> CAST(:query_vector AS vector) LIMIT :k
 
 ## 风险与约束
 
-1. pgvector 默认无内置持久化索引时查询为全表扫描，需在建列后创建 HNSW 索引；首版数据量小可延后，文档中记录建索引命令。
+1. 当前启动流程已创建 `idx_chunks_embedding_hnsw` 余弦距离索引；更大数据规模仍需实际查询计划与负载验证。
 2. 更换 Embedding 模型或维度需要清空并重建向量。
-3. 迁移后首次启动会为存量文件重新生成向量，依赖本地 Ollama 可用。
+3. 补齐缺失向量依赖所选 Embedding 服务可用；失败文件保留旧块，不会产生可检索的新向量。向量通道异常时可降级 BM25，但向量通道正常返回空结果时不会强制关键词兜底。
 
 ## 验证方式
 
