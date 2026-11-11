@@ -1,0 +1,30 @@
+docs/assets/screenshots/README.md
+  b3d72d52f77b1eb3 1-19
+README.md
+  b3d72d52f77b1eb3 7-48
+docs/变更记录.md
+  b3d72d52f77b1eb3 3-8
+README.en.md
+  b3d72d52f77b1eb3 7-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "df0bb66e06771c52bfe925c66979d12289817f9a",
+  "prompts": {
+    "b3d72d52f77b1eb3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ca43-25f0-7ed2-b2d3-a0e3abcf5478",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 1371,
+      "total_deletions": 0,
+      "accepted_lines": 2274,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/cc8fff9d5dcc04b4e615d82a54d6cf1a8a1830ce0556f7f2b8ad9170015e2eb6"
+    }
+  }
+}
