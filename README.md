@@ -4,6 +4,48 @@
 
 前后端分离的企业知识库问答系统：支持账号密码登录、多知识库管理、文件解析分块、混合检索、流式多轮问答与来源引用。
 
+## 界面预览
+
+以下截图来自本地运行实例，展示从登录、知识库管理到对话问答的主要流程。点击图片可查看原图。
+
+| 登录 | 首页工作台 |
+|---|---|
+| [![登录页](docs/assets/screenshots/login.jpg)](docs/assets/screenshots/login.jpg) | [![首页工作台](docs/assets/screenshots/home.jpg)](docs/assets/screenshots/home.jpg) |
+| 独立登录页与产品能力介绍，密码栏留空。 | 知识库、文档与分块统计，以及对话入口；右侧为页面内置问答示意。 |
+
+**多轮对话与来源引用**：切换知识库、恢复历史对话，回答通过数字角标和文档标签标注来源。下图为已有知识库的历史问答示例。
+
+[![知识库对话与来源引用](docs/assets/screenshots/chat.jpg)](docs/assets/screenshots/chat.jpg)
+
+<details>
+<summary>展开查看知识库、文件、用户和系统设置页面</summary>
+
+### 知识库管理
+
+按知识库查看文件数与分块数，支持搜索、进入文件列表，以及管理员创建、编辑和删除。
+
+![知识库管理](docs/assets/screenshots/knowledge-bases.jpg)
+
+### 文件管理
+
+查看文件类型、版本、处理状态和分块数，支持上传、查看分块、更新与删除。
+
+![文件管理](docs/assets/screenshots/files.jpg)
+
+### 用户管理
+
+管理员查看用户角色、新增用户和重置密码；有权限及关联数据校验的删除入口。
+
+![用户管理](docs/assets/screenshots/users.jpg)
+
+### 系统设置
+
+配置分块大小、重叠窗口和检索 TopK；页面说明哪些参数影响后续入库，哪些立即影响问答。
+
+![系统设置](docs/assets/screenshots/settings.jpg)
+
+</details>
+
 ## 功能概览
 
 - **登录与用户管理**：账号密码登录，JWT 鉴权；管理员可新增用户、重置密码、删除用户。

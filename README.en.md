@@ -4,6 +4,48 @@
 
 A full-stack enterprise knowledge base QA system with account authentication, multi-knowledge-base management, document parsing and chunking, hybrid retrieval, streaming multi-turn conversations, and source citations.
 
+## Screenshots
+
+Captured from a locally running instance. Click the images to view them at full size. The interface is currently in Chinese.
+
+| Login | Home workspace |
+|---|---|
+| [![Login page](docs/assets/screenshots/login.jpg)](docs/assets/screenshots/login.jpg) | [![Home workspace](docs/assets/screenshots/home.jpg)](docs/assets/screenshots/home.jpg) |
+| Dedicated login screen and capability overview; the password field is empty. | Knowledge base, document and chunk counts, plus chat entry points. The panel on the right is a built-in illustrative preview. |
+
+**Multi-turn chat and citations**: select a knowledge base, restore conversation history, and inspect numbered citations and document tags. This screenshot shows an existing conversation with the sample knowledge base.
+
+[![Knowledge base chat and source citations](docs/assets/screenshots/chat.jpg)](docs/assets/screenshots/chat.jpg)
+
+<details>
+<summary>View knowledge base, file, user and system settings screens</summary>
+
+### Knowledge bases
+
+View file/chunk counts, search knowledge bases, open their files, and use administrator create, edit and delete controls.
+
+![Knowledge base management](docs/assets/screenshots/knowledge-bases.jpg)
+
+### Files
+
+Inspect file types, versions, processing status and chunk counts; upload, view chunks, update or delete documents.
+
+![File management](docs/assets/screenshots/files.jpg)
+
+### Users
+
+Administrator controls for user roles, account creation, password resets and deletion subject to permission and related-record checks.
+
+![User management](docs/assets/screenshots/users.jpg)
+
+### System settings
+
+Configure chunk size, overlap and retrieval TopK, with guidance on which settings affect future ingestion or current retrieval.
+
+![System settings](docs/assets/screenshots/settings.jpg)
+
+</details>
+
 ## Features
 
 - **Login and user management**: username/password login with JWT authentication. Admins can create users, reset passwords, and delete users.
