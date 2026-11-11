@@ -1,4 +1,8 @@
 import pytest
+import jwt
+from datetime import datetime, timedelta, timezone
+
+from app.config import settings
 
 
 @pytest.mark.asyncio
@@ -52,3 +56,37 @@ async def test_change_password_updates_login_credential(client):
     new_login = await client.post("/api/auth/login", json={"username": "alice", "password": "newpass1"})
     assert old_login.status_code == 400
     assert new_login.status_code == 200
+
+
+async def test_change_password_revokes_old_token(client):
+    login = await client.post("/api/auth/login", json={"username": "alice", "password": "pass1"})
+    headers = {"Authorization": f"Bearer {login.json()['token']}"}
+    response = await client.put("/api/auth/password", headers=headers,
+                                json={"old_password": "pass1", "new_password": "newpass1"})
+    assert response.status_code == 200
+    assert (await client.get("/api/auth/me", headers=headers)).status_code == 401
+    new_login = await client.post("/api/auth/login", json={"username": "alice", "password": "newpass1"})
+    new_headers = {"Authorization": f"Bearer {new_login.json()['token']}"}
+    assert (await client.get("/api/auth/me", headers=new_headers)).status_code == 200
+
+
+@pytest.mark.parametrize("new_password", ["newpass1", "pass1"])
+async def test_admin_reset_revokes_old_token_only_for_target(client, admin_token, new_password):
+    login = await client.post("/api/auth/login", json={"username": "alice", "password": "pass1"})
+    old_headers = {"Authorization": f"Bearer {login.json()['token']}"}
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    response = await client.put("/api/users/2/password", headers=admin_headers, json={"password": new_password})
+    assert response.status_code == 200
+    assert (await client.get("/api/auth/me", headers=old_headers)).status_code == 401
+    assert (await client.get("/api/auth/me", headers=admin_headers)).status_code == 200
+    new_login = await client.post("/api/auth/login", json={"username": "alice", "password": new_password})
+    new_headers = {"Authorization": f"Bearer {new_login.json()['token']}"}
+    assert (await client.get("/api/auth/me", headers=new_headers)).status_code == 200
+
+
+@pytest.mark.parametrize("extra", [{}, {"pwd_ver": None}, {"pwd_ver": ["bad"]}, {"pwd_ver": "非ASCII版本"}, {"pwd_ver": "\ud800"}, {"pwd_ver": "bad", "sub": "invalid"}])
+async def test_legacy_or_malformed_token_is_rejected(client, extra):
+    payload = {"sub": "2", "exp": datetime.now(timezone.utc) + timedelta(hours=1), **extra}
+    token = jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
+    response = await client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401

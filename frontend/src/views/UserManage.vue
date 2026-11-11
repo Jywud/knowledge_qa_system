@@ -2,8 +2,10 @@
 import { reactive, ref, onMounted } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Check, Delete, Key, Plus } from "@element-plus/icons-vue";
-import { api, user } from "../store";
+import { useRouter } from "vue-router";
+import { api, clearAuth, user } from "../store";
 
+const router = useRouter();
 const users = ref([]);
 const createDialog = ref(false);
 const resetDialog = ref(false);
@@ -57,9 +59,14 @@ function openReset(row) {
 async function resetPassword() {
   await resetFormRef.value.validate();
   try {
+    const isSelf = resetTarget.value.id === user.value?.id;
     await api.put(`/users/${resetTarget.value.id}/password`, { password: resetForm.password });
-    ElMessage.success(`已重置 ${resetTarget.value.username} 的密码`);
+    ElMessage.success(isSelf ? "密码重置成功，请重新登录" : `已重置 ${resetTarget.value.username} 的密码`);
     resetDialog.value = false;
+    if (isSelf) {
+      clearAuth();
+      router.replace("/login");
+    }
   } catch (e) {
     ElMessage.error(e.response?.data?.detail || "重置失败");
   }
@@ -107,7 +114,7 @@ onMounted(loadUsers);
             type="danger"
             plain
             :icon="Delete"
-            :disabled="row.id === user.id"
+            :disabled="row.id === user?.id"
             @click="removeUser(row)"
           >
             删除

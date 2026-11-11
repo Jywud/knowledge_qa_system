@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from app.auth import get_current_user, hash_password, require_admin
 from app.audit import log_audit
 from app.database import get_db
-from app.models import User
+from app.models import AuditLog, Conversation, FileRecord, KnowledgeBase, User
 from app.schemas import CreateUserRequest, PasswordResetRequest, UserOut
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -70,10 +71,23 @@ async def delete_user(
 ):
     if user_id == admin.id:
         raise HTTPException(400, "不能删除自己")
-    user = await db.get(User, user_id)
+    user = await db.get(User, user_id, with_for_update=True)
     if not user:
         raise HTTPException(404, "用户不存在")
-    await db.delete(user)
-    await log_audit(db, admin, "user.delete", target=user.username)
-    await db.commit()
+    references = (
+        (KnowledgeBase.created_by, "创建的知识库"),
+        (FileRecord.uploaded_by, "上传的文件"),
+        (Conversation.user_id, "会话记录"),
+        (AuditLog.operator_id, "审计记录"),
+    )
+    for column, label in references:
+        if await db.scalar(select(column).where(column == user_id).limit(1)) is not None:
+            raise HTTPException(409, f"用户仍有{label}，为保留关联数据暂不能删除")
+    try:
+        await db.delete(user)
+        await log_audit(db, admin, "user.delete", target=user.username)
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(409, "用户仍有关联数据，请刷新后重试") from None
     return {"ok": True}

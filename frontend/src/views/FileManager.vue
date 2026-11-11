@@ -84,8 +84,8 @@ async function updateFile({ file }, row) {
   const form = new FormData();
   form.append("file", file);
   try {
-    const res = await api.put(`/files/${row.id}`, form);
-    ElMessage.success(`${res.data.filename} 已更新到 v${res.data.version}，正在后台解析`);
+    await api.put(`/files/${row.id}`, form);
+    ElMessage.success("已提交更新，正在后台解析");
     loadFiles();
   } catch (e) {
     ElMessage.error(e.response?.data?.detail || "更新失败");
@@ -181,12 +181,12 @@ const STATUS_META = {
         <el-table-column label="状态" width="95">
           <template #default="{ row }">
             <el-tooltip
-              v-if="row.status === 'failed' && row.status_message"
+              v-if="row.status_message"
               :content="row.status_message"
               placement="top"
             >
-              <el-tag :type="STATUS_META[row.status]?.type || 'info'" size="small">
-                {{ STATUS_META[row.status]?.label || row.status }}
+              <el-tag :type="row.status === 'ready' ? 'warning' : STATUS_META[row.status]?.type || 'info'" size="small">
+                {{ row.status === 'ready' ? '更新失败' : STATUS_META[row.status]?.label || row.status }}
               </el-tag>
             </el-tooltip>
             <el-tag v-else :type="STATUS_META[row.status]?.type || 'info'" size="small">

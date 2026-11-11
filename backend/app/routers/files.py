@@ -1,4 +1,7 @@
+from datetime import datetime, timezone
+import logging
 from pathlib import Path
+from uuid import uuid4
 
 import aiofiles
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
@@ -14,10 +17,13 @@ from app.schemas import ChunkOut, FileOut
 from app.services.document_service import (
     SUPPORTED_TYPES,
     delete_file_vectors,
+    delete_file_uploads,
     process_file_record,
+    process_file_update,
 )
 
 router = APIRouter(prefix="/api/files", tags=["files"])
+logger = logging.getLogger(__name__)
 
 
 def _upload_dir() -> Path:
@@ -36,14 +42,16 @@ def _safe_filename(filename: str | None) -> str:
 async def _save_upload(file: UploadFile, dest: Path) -> int:
     limit = settings.max_upload_mb * 1024 * 1024
     total = 0
-    async with aiofiles.open(dest, "wb") as out:
-        while chunk := await file.read(1024 * 1024):
-            total += len(chunk)
-            if total > limit:
-                await out.close()
-                dest.unlink(missing_ok=True)
-                raise HTTPException(413, f"文件大小超过限制（{settings.max_upload_mb} MB）")
-            await out.write(chunk)
+    try:
+        async with aiofiles.open(dest, "wb") as out:
+            while chunk := await file.read(1024 * 1024):
+                total += len(chunk)
+                if total > limit:
+                    raise HTTPException(413, f"文件大小超过限制（{settings.max_upload_mb} MB）")
+                await out.write(chunk)
+    except BaseException:
+        dest.unlink(missing_ok=True)
+        raise
     return total
 
 
@@ -140,7 +148,7 @@ async def update_file(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
 ):
-    record = await db.get(FileRecord, file_id)
+    record = await db.get(FileRecord, file_id, with_for_update=True)
     if not record:
         raise HTTPException(404, "文件不存在")
     if record.status == "processing":
@@ -150,23 +158,45 @@ async def update_file(
     if suffix not in SUPPORTED_TYPES:
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 md/docx/pdf/txt")
 
-    await delete_file_vectors(db, file_id)
+    pending_dir = _upload_dir() / ".pending"
+    pending_dir.mkdir(exist_ok=True)
+    save_path = pending_dir / f"{uuid4().hex}.{suffix}"
+    version = record.version
+    original_status = record.status
+    processing_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    commit_attempted = False
+    chunk_count = await db.scalar(select(func.count(Chunk.id)).where(Chunk.file_id == file_id))
+    try:
+        size = await _save_upload(file, save_path)
+        record.status = "processing"
+        record.status_message = None
+        record.updated_at = processing_at
+        commit_attempted = True
+        await db.commit()
+    except BaseException:
+        can_remove = not commit_attempted
+        if commit_attempted:
+            from app.database import SessionLocal
 
-    save_path = _upload_dir() / f"{file_id}_{filename}"
-    size = await _save_upload(file, save_path)
-
-    record.filename = filename
-    record.file_type = suffix
-    record.size = size
-    record.version += 1
-    record.status = "processing"
-    record.status_message = None
-    await db.commit()
-    await db.refresh(record)
+            try:
+                await db.rollback()
+                async with SessionLocal() as recovery_db:
+                    current = await recovery_db.get(FileRecord, file_id, with_for_update=True)
+                    if (current and current.version == version and current.status == "processing"
+                            and current.updated_at == processing_at):
+                        current.status = original_status
+                        current.status_message = "更新提交失败，已保留原版本，请重试"
+                        await recovery_db.commit()
+                can_remove = True
+            except Exception:
+                logger.exception("文件 %s 更新提交状态无法核实，保留暂存文件", file_id)
+        if can_remove:
+            save_path.unlink(missing_ok=True)
+        raise
     background_tasks.add_task(
-        process_file_record, file_id, save_path, suffix, filename, record.kb_id
+        process_file_update, file_id, save_path, suffix, filename, size, version
     )
-    return _file_out(record, 0, admin.username)
+    return _file_out(record, chunk_count, admin.username)
 
 
 @router.delete("/{file_id}")
@@ -175,7 +205,7 @@ async def delete_file(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    record = await db.get(FileRecord, file_id)
+    record = await db.get(FileRecord, file_id, with_for_update=True)
     if not record:
         raise HTTPException(404, "文件不存在")
     if record.status == "processing":
@@ -186,6 +216,5 @@ async def delete_file(
     await log_audit(db, admin, "file.delete", target=record.filename)
     await db.commit()
 
-    for path in _upload_dir().glob(f"{file_id}_*"):
-        path.unlink(missing_ok=True)
+    delete_file_uploads(_upload_dir(), file_id)
     return {"ok": True}

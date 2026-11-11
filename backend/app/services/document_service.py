@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import logging
 import re
 
 from docx import Document as DocxDocument
@@ -12,7 +13,7 @@ from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
 from langchain_ollama import OllamaEmbeddings
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import BASE_DIR, settings
@@ -20,6 +21,7 @@ from app.models import Chunk, FileRecord
 from app.services.settings_service import get_system_settings
 
 SUPPORTED_TYPES = {"md", "docx", "pdf", "txt"}
+logger = logging.getLogger(__name__)
 
 
 def get_embeddings() -> OllamaEmbeddings | OpenAIEmbeddings:
@@ -241,6 +243,8 @@ async def ingest_file(
         texts.append(chunk.page_content)
     await db.flush()
     vectors = await get_embeddings().aembed_documents(texts)
+    if len(vectors) != len(rows):
+        raise ValueError("向量数量与文档分块数量不一致")
     for row, vector in zip(rows, vectors):
         row.embedding = vector
     return len(chunks)
@@ -268,6 +272,89 @@ async def process_file_record(
             await db.commit()
 
 
+def _uploaded_paths(upload_dir: Path, file_id: int) -> list[Path]:
+    return [
+        path
+        for directory in (upload_dir, upload_dir / ".versions")
+        for path in directory.glob(f"{file_id}_*")
+        if path.is_file()
+    ]
+
+
+def _remove_upload(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        logger.warning("无法清理上传文件 %s", path, exc_info=True)
+
+
+def delete_file_uploads(upload_dir: Path, file_id: int) -> None:
+    """清理该文件的遗留及版本文件，不影响其他文件或暂存任务。"""
+    for path in _uploaded_paths(upload_dir, file_id):
+        _remove_upload(path)
+
+
+async def process_file_update(
+    file_id: int, path: Path, file_type: str, filename: str, size: int, expected_version: int
+) -> None:
+    """新分块和元数据一起提交；失败时保留可用的旧版本。"""
+    from app.database import SessionLocal
+
+    upload_dir = path.parent.parent  # 更新文件只来自 uploads/.pending。
+    destination = upload_dir / ".versions" / f"{file_id}_v{expected_version + 1}_{filename}"
+    previous_paths: list[Path] = []
+    moved = False
+    committed = False
+    try:
+        async with SessionLocal() as db:
+            record = await db.get(FileRecord, file_id, with_for_update=True)
+            if not record or record.version != expected_version or record.status != "processing":
+                return
+            previous_paths = _uploaded_paths(upload_dir, file_id)
+            await delete_file_vectors(db, file_id)
+            chunk_count = await ingest_file(db, file_id, path, file_type, filename, record.kb_id)
+            if not chunk_count:
+                raise ValueError("新文件没有可用内容")
+            destination.parent.mkdir(exist_ok=True)
+            path.replace(destination)
+            moved = True
+            record.filename = filename
+            record.file_type = file_type
+            record.size = size
+            record.version = expected_version + 1
+            record.status = "ready"
+            record.status_message = None
+            await db.commit()
+            committed = True
+    except Exception as exc:
+        # COMMIT 可能已成功但回包失败，必须重新核实，不能直接删除新原件。
+        try:
+            async with SessionLocal() as db:
+                record = await db.get(FileRecord, file_id, with_for_update=True)
+                if record and record.version > expected_version:
+                    committed = True
+                else:
+                    if moved:
+                        _remove_upload(destination)
+                    if record and record.version == expected_version and record.status == "processing":
+                        chunk_count = await db.scalar(
+                            select(func.count(Chunk.id)).where(Chunk.file_id == file_id)
+                        )
+                        record.status = "ready" if chunk_count else "failed"
+                        record.status_message = f"更新失败，已保留原版本：{exc}"[:255]
+                        await db.commit()
+        except Exception:
+            logger.exception("文件 %s 更新状态核实失败，保留磁盘文件以免丢失数据", file_id)
+    finally:
+        _remove_upload(path)
+
+    if committed:
+        # 只删除本次事务开始时见到的旧文件，不匹配之后并发更新生成的文件。
+        for old_path in previous_paths:
+            if old_path != destination:
+                _remove_upload(old_path)
+
+
 async def delete_file_vectors(db: AsyncSession, file_id: int) -> None:
     await db.execute(delete(Chunk).where(Chunk.file_id == file_id))
     await db.flush()
@@ -291,12 +378,14 @@ async def reindex_missing_embeddings(db: AsyncSession) -> int:
         record = await db.get(FileRecord, file_id)
         if record is None:
             continue
-        matches = list(upload_dir.glob(f"{file_id}_*"))
-        if not matches:
+        current_path = upload_dir / ".versions" / f"{file_id}_v{record.version}_{record.filename}"
+        if not current_path.is_file():
+            current_path = upload_dir / f"{file_id}_{record.filename}"
+        if not current_path.is_file():
             continue
         await delete_file_vectors(db, file_id)
         rebuilt += await ingest_file(
-            db, file_id, matches[0], record.file_type, record.filename, record.kb_id
+            db, file_id, current_path, record.file_type, record.filename, record.kb_id
         )
     await db.commit()
     return rebuilt

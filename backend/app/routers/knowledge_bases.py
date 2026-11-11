@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 
 from app.auth import get_current_user, require_admin
 from app.audit import log_audit
 from app.database import get_db
-from app.models import Chunk, FileRecord, KnowledgeBase, User
+from app.config import BASE_DIR, settings
+from app.models import Chunk, Conversation, FileRecord, KnowledgeBase, User
 from app.schemas import KnowledgeBaseCreate, KnowledgeBaseOut, KnowledgeBaseUpdate
-from app.services.document_service import delete_file_vectors
+from app.services.document_service import delete_file_uploads, delete_file_vectors
 
 router = APIRouter(prefix="/api/knowledge-bases", tags=["knowledge-bases"])
 
@@ -98,18 +100,34 @@ async def delete_knowledge_base(
     admin: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    kb = await db.get(KnowledgeBase, kb_id)
+    kb = await db.get(KnowledgeBase, kb_id, with_for_update=True)
     if not kb:
         raise HTTPException(404, "知识库不存在")
 
+    conversation_id = await db.scalar(
+        select(Conversation.id).where(Conversation.kb_id == kb_id).limit(1)
+    )
+    if conversation_id is not None:
+        raise HTTPException(409, "知识库仍有关联会话，请先删除相关会话后再删除知识库")
     files = (
-        await db.execute(select(FileRecord).where(FileRecord.kb_id == kb_id))
+        await db.execute(
+            select(FileRecord).where(FileRecord.kb_id == kb_id)
+            .order_by(FileRecord.id).with_for_update()
+        )
     ).scalars().all()
-    for record in files:
-        await delete_file_vectors(db, record.id)
-        await db.delete(record)
-    await db.delete(kb)
-    await db.commit()
-    await log_audit(db, admin, "kb.delete", target=kb.name)
-    await db.commit()
+    if any(record.status == "processing" for record in files):
+        raise HTTPException(409, "知识库有文件正在后台处理中，请稍后再删除")
+    file_ids = [record.id for record in files]
+    try:
+        for record in files:
+            await delete_file_vectors(db, record.id)
+            await db.delete(record)
+        await db.delete(kb)
+        await log_audit(db, admin, "kb.delete", target=kb.name)
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(409, "知识库仍有关联数据，请刷新后重试") from None
+    for file_id in file_ids:
+        delete_file_uploads(BASE_DIR / settings.upload_dir, file_id)
     return {"ok": True}

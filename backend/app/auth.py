@@ -26,10 +26,19 @@ def verify_password(password: str, stored: str | None) -> bool:
     return hmac.compare_digest(calc.hex(), digest)
 
 
+def _password_version(user: User) -> str:
+    return hmac.new(
+        settings.jwt_secret.encode(),
+        f"password-version:{user.password_hash or ''}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
 def create_token(user: User) -> str:
     payload = {
         "sub": str(user.id),
         "exp": datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expire_hours),
+        "pwd_ver": _password_version(user),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
@@ -39,12 +48,20 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
     if not header.startswith("Bearer "):
         raise HTTPException(401, "未登录")
     try:
-        payload = jwt.decode(header[7:], settings.jwt_secret, algorithms=["HS256"])
-    except jwt.PyJWTError:
+        payload = jwt.decode(
+            header[7:], settings.jwt_secret, algorithms=["HS256"],
+            options={"require": ["sub", "exp", "pwd_ver"]},
+        )
+        user_id = int(payload["sub"])
+        if not isinstance(payload["pwd_ver"], str) or not payload["pwd_ver"].isascii():
+            raise ValueError("invalid password version")
+    except (jwt.PyJWTError, KeyError, TypeError, ValueError):
         raise HTTPException(401, "登录已过期，请重新登录")
-    user = await db.get(User, int(payload["sub"]))
+    user = await db.get(User, user_id)
     if not user:
         raise HTTPException(401, "用户不存在")
+    if not hmac.compare_digest(payload["pwd_ver"], _password_version(user)):
+        raise HTTPException(401, "密码已变更，请重新登录")
     return user
 
 

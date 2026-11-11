@@ -90,8 +90,10 @@ async function changePassword() {
       old_password: passwordForm.oldPassword,
       new_password: passwordForm.newPassword,
     });
-    ElMessage.success("密码修改成功");
+    ElMessage.success("密码修改成功，请重新登录");
     passwordDialog.value = false;
+    clearAuth();
+    router.replace("/login");
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || "密码修改失败");
   }
