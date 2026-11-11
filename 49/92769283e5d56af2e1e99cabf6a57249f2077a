@@ -1,0 +1,50 @@
+frontend/src/components/AppLayout.vue
+  b3d72d52f77b1eb3 93,95-96
+backend/app/routers/users.py
+  b3d72d52f77b1eb3 4,9,74,77-92
+backend/app/services/document_service.py
+  b3d72d52f77b1eb3 3,16,24,246-247,275-357,381-384,388
+backend/tests/test_file_updates.py
+  b3d72d52f77b1eb3 1-322
+backend/app/routers/knowledge_bases.py
+  b3d72d52f77b1eb3 4,9-10,12,103,107-111,113-116,118-132
+docs/变更记录.md
+  b3d72d52f77b1eb3 1-41
+backend/tests/test_auth.py
+  b3d72d52f77b1eb3 2-5,59-92
+frontend/src/views/FileManager.vue
+  b3d72d52f77b1eb3 87-88,184,188-189
+frontend/src/views/UserManage.vue
+  b3d72d52f77b1eb3 5-6,8,62,64,66-69,117
+backend/app/auth.py
+  b3d72d52f77b1eb3 29-36,41,51-58,60,63-64
+docs/superpowers/plans/2026-11-11-p1-bugfixes.md
+  b3d72d52f77b1eb3 1-102
+backend/tests/test_deletions.py
+  b3d72d52f77b1eb3 1-118
+backend/tests/conftest.py
+  b3d72d52f77b1eb3 4,15,18-22,26-27,39,43-47,52
+backend/app/routers/files.py
+  b3d72d52f77b1eb3 1-2,4,20,22,26,45-54,151,161-195,197,199,208,219
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "4992769283e5d56af2e1e99cabf6a57249f2077a",
+  "prompts": {
+    "b3d72d52f77b1eb3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ca43-25f0-7ed2-b2d3-a0e3abcf5478",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 1186,
+      "total_deletions": 64,
+      "accepted_lines": 895,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/f77b7116d3bdac257b2104d721d19d47e817a878e30783ee4725627de066703a"
+    }
+  }
+}
