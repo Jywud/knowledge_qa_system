@@ -128,6 +128,9 @@ async def chat(
     config = {"configurable": {"thread_id": f"user-{conv.user_id}-conv-{conv.id}"}}
     user_msg = HumanMessage(content=body.content)
     system_settings = await get_system_settings(db)
+    top_k = system_settings.top_k
+    # 设置可能首次创建；提交并释放连接后，流生成只使用基本值快照。
+    await db.commit()
 
     async def generate_and_save_title():
         try:
@@ -150,8 +153,8 @@ async def chat(
             async for chunk, _metadata in graph.astream(
                 {
                     "messages": [user_msg],
-                    "kb_id": str(conv.kb_id) if conv.kb_id else None,
-                    "top_k": system_settings.top_k,
+                    "kb_id": str(kb_id),
+                    "top_k": top_k,
                 },
                 config=config,
                 stream_mode="messages",
@@ -169,12 +172,15 @@ async def chat(
                 sources = [source for source in sources if source["index"] in cited]
             else:
                 sources = []
-            grouped: dict[str, dict] = {}
+            grouped: dict[tuple, dict] = {}
             for source in sources:
+                key = (source.get("file_id"), source.get("file_version"), source["source"])
                 entry = grouped.setdefault(
-                    source["source"],
+                    key,
                     {
                         "source": source["source"],
+                        "file_id": source.get("file_id"),
+                        "file_version": source.get("file_version"),
                         "file_type": source.get("file_type", ""),
                         "kb_name": source.get("kb_name", ""),
                         "count": 0,
@@ -188,6 +194,8 @@ async def chat(
                         {
                             "index": source["index"],
                             "file_id": source.get("file_id"),
+                            "chunk_id": source.get("chunk_id"),
+                            "file_version": source.get("file_version"),
                             "chunk_index": source.get("chunk_index"),
                             "text": excerpt,
                         }

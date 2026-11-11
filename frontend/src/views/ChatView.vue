@@ -1,8 +1,8 @@
 <script setup>
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
-import MarkdownIt from "markdown-it";
-import { Promotion } from "@element-plus/icons-vue";
+import { renderMarkdown } from "../utils/markdown";
+import { Loading, Promotion } from "@element-plus/icons-vue";
 import { useRouter } from "vue-router";
 import {
   api,
@@ -20,37 +20,90 @@ const input = ref("");
 const sending = ref(false);
 const THINKING_STEPS = ["正在检索知识库…", "正在整理相关内容…", "AI 正在思考中…"];
 const sourceDialog = reactive({ visible: false, source: "", items: [] });
-const chunkCache = {};
 let locallyCreatedConversationId = null;
 
-async function fetchChunkContent(fileId, chunkIndex) {
-  if (!chunkCache[fileId]) {
-    const res = await api.get(`/files/${fileId}/chunks`);
-    chunkCache[fileId] = res.data;
+function normalizeSources(value) {
+  if (typeof value === "string") {
+    try { value = JSON.parse(value); } catch { return []; }
   }
-  const chunk = chunkCache[fileId].find((c) => String(c.chunk_index) === String(chunkIndex));
-  return chunk ? chunk.content : "";
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry) => entry && (typeof entry === "object" || typeof entry === "string"))
+    .map((entry) => {
+      const group = typeof entry === "string" ? { source: "历史引用", excerpt: entry } : entry;
+      const raw = Array.isArray(group.excerpts) && group.excerpts.length ? group.excerpts : [group];
+      return {
+        ...group,
+        source: typeof group.source === "string" ? group.source : "历史引用",
+        excerpts: raw.map((excerpt, index) => {
+          const item = typeof excerpt === "string" ? { text: excerpt } : excerpt || {};
+          return {
+            ...item,
+            index: item.index ?? group.index ?? index + 1,
+            chunk_id: item.chunk_id,
+            file_id: item.file_id ?? group.file_id,
+            file_version: item.file_version ?? group.file_version,
+            text: typeof item.text === "string" ? item.text : typeof item.excerpt === "string" ? item.excerpt : "",
+          };
+        }),
+      };
+    });
+}
+
+function sourceId(value) {
+  if (typeof value !== "number" && !(typeof value === "string" && /^\d+$/.test(value))) return null;
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+async function loadSourceItem(item) {
+  item.content = "";
+  item.error = "";
+  item.notice = "";
+  if (!item.chunk_id || !item.file_id || !item.file_version) {
+    item.notice = item.text ? "历史引用未保存精确位置，仅展示当时保存的摘要。"
+      : "这条历史引用没有保存原文片段，无法精确定位。";
+    return;
+  }
+  item.loading = true;
+  try {
+    const { data } = await api.get(`/chunks/${item.chunk_id}`, {
+      params: { file_id: item.file_id, version: item.file_version }, timeout: 15000,
+    });
+    if (sourceId(data?.id) !== item.chunk_id || sourceId(data?.file_id) !== item.file_id
+        || sourceId(data?.file_version) !== item.file_version || typeof data?.content !== "string") {
+      item.error = "返回的原文与引用信息不符，此引用已失效。";
+      return;
+    }
+    item.content = data.content;
+    item.page_no = data.page_no;
+    item.file_type = data.file_type;
+  } catch (error) {
+    const status = error.response?.status;
+    if (status === 401) {
+      item.error = "登录已过期，请重新登录";
+      handleUnauthorized(item.error);
+    } else if (status === 403) item.error = "没有权限查看该引用";
+    else if (status === 404) item.error = "原文片段已不存在，文件可能已更新或删除。";
+    else if (status === 410) item.error = "原文件已更新，此引用已失效。";
+    else item.error = "原文加载失败，请稍后重试。";
+  } finally {
+    item.loading = false;
+  }
 }
 
 async function openSourceDialog(source) {
-  sourceDialog.source = source.source;
-  sourceDialog.items = source.excerpts.map((excerpt) =>
-    typeof excerpt === "object" ? { ...excerpt, content: "" } : { text: excerpt, content: "" }
-  );
+  const group = normalizeSources([source])[0];
+  sourceDialog.source = group?.source || "引用原文";
+  sourceDialog.items = (group?.excerpts || []).map((item) => ({
+    ...item,
+    chunk_id: sourceId(item.chunk_id), file_id: sourceId(item.file_id),
+    file_version: sourceId(item.file_version), content: "", loading: false, error: "", notice: "",
+  }));
   sourceDialog.visible = true;
-  for (const item of sourceDialog.items) {
-    if (item.file_id != null) {
-      item.content = await fetchChunkContent(item.file_id, item.chunk_index);
-    }
-  }
+  // 每次打开重取单块；响应只更新本次的 item，不能覆盖后来打开的弹窗。
+  await Promise.all(sourceDialog.items.map((item) => loadSourceItem(item)));
 }
 const msgListRef = ref(null);
-
-const markdown = new MarkdownIt({ html: false, breaks: true, linkify: true });
-
-function renderMarkdown(content) {
-  return markdown.render(content || "");
-}
 
 const canSend = computed(() => Boolean(input.value.trim() && selectedKb.value && !sending.value));
 function scrollBottom() {
@@ -92,7 +145,7 @@ async function selectConversation(id) {
     messages.value = res.data.map((m) => ({
       role: m.role,
       content: m.content,
-      sources: m.sources ? JSON.parse(m.sources) : [],
+      sources: normalizeSources(m.sources),
       done: true,
     }));
     scrollBottom();
@@ -182,7 +235,7 @@ async function send() {
           assistant.content += evt.content;
           scrollBottom();
         } else if (evt.type === "sources") {
-          assistant.sources = evt.sources;
+          assistant.sources = normalizeSources(evt.sources);
         } else if (evt.type === "error") {
           assistant.content += `\n[错误] ${evt.message}`;
         } else if (evt.type === "done") {
@@ -255,7 +308,7 @@ async function send() {
             <div v-if="msg.sources && msg.sources.length" class="sources">
               <el-tag
                 v-for="s in msg.sources"
-                :key="s.index ?? s.source"
+                :key="s.file_id != null ? s.file_id + ':' + s.file_version : s.index ?? s.source"
                 size="small"
                 type="info"
                 class="source-tag"
@@ -291,10 +344,24 @@ async function send() {
         </el-button>
       </div>
 
-      <el-dialog v-model="sourceDialog.visible" :title="sourceDialog.source" width="680px">
-        <div v-for="item in sourceDialog.items" :key="item.index ?? item.text" class="source-item">
-          <div v-if="item.index" class="source-item-title">来源{{ item.index }}</div>
-          <div class="source-item-content">{{ item.content || item.text }}</div>
+      <el-dialog v-model="sourceDialog.visible" :title="sourceDialog.source" width="min(840px, calc(100vw - 32px))">
+        <div v-for="(item, position) in sourceDialog.items" :key="position" class="source-item">
+          <div class="source-item-title">
+            来源{{ item.index ?? position + 1 }}
+            <span v-if="item.file_version" class="source-extra">v{{ item.file_version }}</span>
+            <span v-if="item.file_type === 'pdf' && item.page_no != null" class="source-extra">第 {{ item.page_no + 1 }} 页</span>
+          </div>
+          <div v-if="item.loading" class="source-note" role="status">
+            <el-icon class="is-loading"><Loading /></el-icon> 正在加载原文…
+          </div>
+          <div v-if="item.error" class="source-error" role="alert">
+            {{ item.error }}
+            <el-button link type="primary" size="small" :disabled="item.loading" @click="loadSourceItem(item)">重试</el-button>
+          </div>
+          <div v-if="item.notice" class="source-note">{{ item.notice }}</div>
+          <div v-if="!item.content && item.text" class="source-note">当时保存的引用摘要</div>
+          <div v-if="item.content || item.text" class="source-item-content">{{ item.content || item.text }}</div>
+          <div v-else-if="!item.loading" class="source-note">暂无可展示的原文内容</div>
         </div>
       </el-dialog>
     </div>
@@ -411,6 +478,26 @@ async function send() {
   color: var(--el-color-primary);
 }
 
+.markdown-body :deep(.citation-badge) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  margin: 0 3px;
+  border: 1px solid var(--color-border-accent);
+  border-radius: 6px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: 0.3em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .sources {
   margin-top: 8px;
   display: flex;
@@ -448,6 +535,18 @@ async function send() {
   margin-bottom: 4px;
   font-weight: 600;
   color: var(--color-primary);
+}
+
+.source-note {
+  margin: 6px 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.source-error {
+  margin: 6px 0;
+  color: var(--color-danger);
+  font-size: 13px;
 }
 
 .source-item-content {

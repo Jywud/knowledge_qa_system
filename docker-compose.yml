@@ -39,10 +39,14 @@ services:
       LLM_MODEL: ${LLM_MODEL:-deepseek-v4.1-flash}
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRE_HOURS: ${JWT_EXPIRE_HOURS:-24}
+      TRUSTED_PROXY_IPS: ${QA_PROXY_IP:-172.30.250.3}
     volumes:
       - uploads_data:/app/uploads
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - proxy_net
 
   frontend:
     build: ./frontend
@@ -51,6 +55,15 @@ services:
       - backend
     ports:
       - "${FRONTEND_PORT:-8080}:80"
+    networks:
+      proxy_net:
+        ipv4_address: ${QA_PROXY_IP:-172.30.250.3}
+
+networks:
+  proxy_net:
+    ipam:
+      config:
+        - subnet: ${QA_PROXY_SUBNET:-172.30.250.0/24}
 
 volumes:
   pg_data:

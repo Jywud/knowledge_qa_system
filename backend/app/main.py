@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,12 +10,22 @@ from app import models  # noqa: F401 确保模型注册
 from app.config import settings
 from app.database import Base, engine
 from app.auth import hash_password
-from app.routers import auth, chat, files, users
+from app.routers import auth, chat, chunks, files, users
 from app.routers import knowledge_bases
 from app.routers import settings as settings_router
 from app.database import SessionLocal
 from app.services.rag_service import build_graph
 from app.services.document_service import reindex_missing_embeddings
+
+logger = logging.getLogger(__name__)
+
+
+async def _reindex_on_startup() -> None:
+    try:
+        async with SessionLocal() as db:
+            await reindex_missing_embeddings(db)
+    except Exception:
+        logger.exception("启动向量补齐失败，继续启动；缺失向量待服务恢复后重新处理")
 
 
 @asynccontextmanager
@@ -90,8 +101,7 @@ async def lifespan(app: FastAPI):
         await conn.execute(
             text("UPDATE files SET kb_id=:kb_id WHERE kb_id IS NULL"), {"kb_id": default_kb_id}
         )
-    async with SessionLocal() as db:
-        await reindex_missing_embeddings(db)
+    await _reindex_on_startup()
     async with AsyncPostgresSaver.from_conn_string(settings.database_url) as checkpointer:
         await checkpointer.setup()
         app.state.checkpointer = checkpointer
@@ -114,6 +124,7 @@ app.include_router(auth.router)
 app.include_router(knowledge_bases.router)
 app.include_router(files.router)
 app.include_router(chat.router)
+app.include_router(chunks.router)
 app.include_router(settings_router.router)
 
 

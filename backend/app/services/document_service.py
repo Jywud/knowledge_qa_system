@@ -367,25 +367,36 @@ async def reindex_missing_embeddings(db: AsyncSession) -> int:
         .join(Chunk, Chunk.file_id == FileRecord.id)
         .where(Chunk.embedding.is_(None))
         .distinct()
+        .order_by(FileRecord.id)
     )
     file_ids = result.scalars().all()
+    await db.rollback()
     if not file_ids:
         return 0
 
     upload_dir = BASE_DIR / settings.upload_dir
     rebuilt = 0
     for file_id in file_ids:
-        record = await db.get(FileRecord, file_id)
-        if record is None:
-            continue
-        current_path = upload_dir / ".versions" / f"{file_id}_v{record.version}_{record.filename}"
-        if not current_path.is_file():
-            current_path = upload_dir / f"{file_id}_{record.filename}"
-        if not current_path.is_file():
-            continue
-        await delete_file_vectors(db, file_id)
-        rebuilt += await ingest_file(
-            db, file_id, current_path, record.file_type, record.filename, record.kb_id
-        )
-    await db.commit()
+        try:
+            record = await db.get(FileRecord, file_id)
+            if record is None:
+                await db.rollback()
+                continue
+            current_path = upload_dir / ".versions" / f"{file_id}_v{record.version}_{record.filename}"
+            if not current_path.is_file():
+                current_path = upload_dir / f"{file_id}_{record.filename}"
+            if not current_path.is_file():
+                await db.rollback()
+                continue
+            await delete_file_vectors(db, file_id)
+            count = await ingest_file(
+                db, file_id, current_path, record.file_type, record.filename, record.kb_id
+            )
+            if count == 0:
+                raise ValueError("重建未产生有效分块，保留原分块")
+            await db.commit()
+            rebuilt += count
+        except Exception:
+            await db.rollback()
+            logger.exception("文件 %s 启动向量重建失败，保留原分块并继续", file_id)
     return rebuilt

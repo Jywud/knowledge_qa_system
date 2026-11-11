@@ -141,7 +141,11 @@ def make_chat_node(llm: ChatOpenAI):
                 "source": d.metadata.get("source", ""),
                 "page": d.metadata.get("page", 0),
                 "file_id": d.metadata.get("file_id"),
+                "chunk_id": d.metadata.get("chunk_id"),
+                "file_version": d.metadata.get("file_version"),
                 "chunk_index": d.metadata.get("chunk_index"),
+                "file_type": d.metadata.get("file_type", ""),
+                "kb_name": d.metadata.get("kb_name", ""),
                 "excerpt": d.page_content[:150].replace("\n", " ") + ("…" if len(d.page_content) > 150 else ""),
             }
             for i, d in enumerate(docs)

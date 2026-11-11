@@ -20,8 +20,10 @@ def _row_document(row) -> Document:
     return Document(
         page_content=row.content,
         metadata={
+            "chunk_id": str(row.chunk_id),
             "kb_id": str(row.kb_id),
             "file_id": str(row.file_id),
+            "file_version": row.file_version,
             "chunk_index": str(row.chunk_index),
             "source": row.filename,
             "page": row.page_no,
@@ -58,8 +60,8 @@ async def _vector_search(query_vector: list[float], kb_id: int | None, limit: in
 
     params: dict = {"qv": str(query_vector), "k": limit}
     statement = """
-        SELECT c.file_id, c.chunk_index, c.page_no, c.content,
-               f.kb_id, f.filename, f.file_type, f.created_at,
+        SELECT c.id AS chunk_id, c.file_id, c.chunk_index, c.page_no, c.content,
+               f.kb_id, f.filename, f.file_type, f.created_at, f.version AS file_version,
                kb.name AS kb_name
         FROM chunks c
         JOIN files f ON f.id = c.file_id
@@ -109,6 +111,7 @@ async def hybrid_search(query: str, kb_id: int | None, top_k: int) -> list[Docum
     async with SessionLocal() as db:
         sql_statement = (
             select(
+                Chunk.id.label("chunk_id"),
                 Chunk.file_id,
                 Chunk.chunk_index,
                 Chunk.page_no,
@@ -117,6 +120,7 @@ async def hybrid_search(query: str, kb_id: int | None, top_k: int) -> list[Docum
                 FileRecord.filename,
                 FileRecord.file_type,
                 FileRecord.created_at,
+                FileRecord.version.label("file_version"),
                 KnowledgeBase.name.label("kb_name"),
             )
             .join(FileRecord, FileRecord.id == Chunk.file_id)

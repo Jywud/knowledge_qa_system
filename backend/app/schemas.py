@@ -11,6 +11,11 @@ class UserOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class LoginOut(BaseModel):
+    token: str
+    user: UserOut
+
+
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -38,6 +43,13 @@ class ChunkOut(BaseModel):
     content: str
 
     model_config = {"from_attributes": True}
+
+
+class ChunkDetailOut(ChunkOut):
+    file_id: int
+    file_version: int
+    filename: str
+    file_type: str
 
 
 class KnowledgeBaseOut(BaseModel):

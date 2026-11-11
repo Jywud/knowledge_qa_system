@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     jwt_expire_hours: int = 24
     login_max_attempts: int = 5
     login_lock_minutes: int = 15
+    trusted_proxy_ips: str = "127.0.0.1,::1"
 
 
 settings = Settings()

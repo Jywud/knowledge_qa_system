@@ -5,7 +5,24 @@ export const api = axios.create({ baseURL: "/api", timeout: 120000 });
 
 export const token = ref(localStorage.getItem("kqa_token") || "");
 
-export const user = ref(JSON.parse(localStorage.getItem("kqa_user") || "null"));
+function publicUser(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return { id: value.id, username: value.username, role: value.role };
+}
+
+function readStoredUser() {
+  try {
+    const value = publicUser(JSON.parse(localStorage.getItem("kqa_user") || "null"));
+    if (value) localStorage.setItem("kqa_user", JSON.stringify(value));
+    else localStorage.removeItem("kqa_user");
+    return value;
+  } catch {
+    localStorage.removeItem("kqa_user");
+    return null;
+  }
+}
+
+export const user = ref(readStoredUser());
 
 export const conversations = ref([]);
 
@@ -30,9 +47,9 @@ api.interceptors.response.use(
 
 export function setAuth(newToken, newUser) {
   token.value = newToken;
-  user.value = newUser;
+  user.value = publicUser(newUser);
   localStorage.setItem("kqa_token", newToken);
-  localStorage.setItem("kqa_user", JSON.stringify(newUser));
+  localStorage.setItem("kqa_user", JSON.stringify(user.value));
 }
 
 export function clearAuth() {

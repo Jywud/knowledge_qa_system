@@ -13,6 +13,29 @@ from app.models import Chunk, FileRecord
 from app.services.document_service import reindex_missing_embeddings
 
 
+async def test_reindex_failure_rolls_back_one_file_and_continues(test_db, existing_file, embeddings):
+    async with test_db() as db:
+        second = FileRecord(kb_id=1, filename="second.md", file_type="md", uploaded_by=1)
+        db.add(second)
+        await db.flush()
+        second_id = second.id
+        db.add(Chunk(file_id=second_id, chunk_index=0, content="old second"))
+        await db.commit()
+    (existing_file.path.parent / f"{second_id}_second.md").write_text("second document", encoding="utf8")
+    async def embed(texts):
+        if "original" in texts:
+            raise RuntimeError("embedding unavailable")
+        return [[0.1] * settings.embed_dim for _ in texts]
+    embeddings.aembed_documents.side_effect = embed
+    async with test_db() as db:
+        assert await reindex_missing_embeddings(db) == 1
+    async with test_db() as db:
+        rows = (await db.scalars(select(Chunk).order_by(Chunk.file_id))).all()
+        assert [(row.file_id, row.content) for row in rows] == [(existing_file.id, "original content"), (second_id, "second document")]
+        assert rows[0].embedding is None
+        assert rows[1].embedding is not None
+
+
 @pytest.fixture
 async def existing_file(test_db, tmp_path):
     async with test_db() as db:
