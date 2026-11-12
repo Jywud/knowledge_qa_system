@@ -24,6 +24,8 @@ function createSubject(get) {
     useRouter: () => ({replace: (path) => navigations.push(path)}),
     api: {get: async (url, options) => {calls.push([url, options]); return get(url, options);}},
     conversations: {value: []}, currentConversationId, token, selectedKb: {value: 1},
+    knowledgeBases: {value: [{id: 1, chunk_count: 1}]},
+    loadKnowledgeBases: async () => {}, refreshUser: async () => {},
     loadConversations: async () => {}, clearAuth: () => {token.value = ""; currentConversationId.value = null;},
   };
   vm.createContext(box);

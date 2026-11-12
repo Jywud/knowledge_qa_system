@@ -2,15 +2,18 @@
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import { renderMarkdown } from "../utils/markdown";
-import { Loading, Promotion } from "@element-plus/icons-vue";
+import { Collection, Loading, Top } from "@element-plus/icons-vue";
 import { useRouter } from "vue-router";
 import {
   api,
   conversations,
   currentConversationId,
   loadConversations,
+  loadKnowledgeBases,
+  refreshUser,
   token,
   selectedKb,
+  knowledgeBases,
   clearAuth,
 } from "../store";
 
@@ -18,8 +21,24 @@ const router = useRouter();
 const messages = ref([]);
 const input = ref("");
 const sending = ref(false);
+const kbLocked = computed(() => currentConversationId.value !== null);
+const hasAvailableContent = computed(() => knowledgeBases.value.some(
+  (kb) => kbSelectable(kb) && (selectedKb.value === null || kb.id === selectedKb.value)
+));
+
+function selectScope(value) {
+  selectedKb.value = value === "all" ? null : value;
+}
+
+function kbSelectable(kb) {
+  return kb.chunk_count > 0;
+}
+
+function kbLabel(kb) {
+  return kbSelectable(kb) ? kb.name : `${kb.name}（暂无文档）`;
+}
 const THINKING_STEPS = ["正在检索知识库…", "正在整理相关内容…", "AI 正在思考中…"];
-const sourceDialog = reactive({ visible: false, source: "", items: [] });
+const sourceDialog = reactive({ visible: false, source: "", kbName: "", items: [] });
 let locallyCreatedConversationId = null;
 
 function normalizeSources(value) {
@@ -86,6 +105,7 @@ async function loadSourceItem(item) {
     else if (status === 404) item.error = "原文片段已不存在，文件可能已更新或删除。";
     else if (status === 410) item.error = "原文件已更新，此引用已失效。";
     else item.error = "原文加载失败，请稍后重试。";
+    if (status === 403 || status === 404) await refreshAccess();
   } finally {
     item.loading = false;
   }
@@ -94,6 +114,7 @@ async function loadSourceItem(item) {
 async function openSourceDialog(source) {
   const group = normalizeSources([source])[0];
   sourceDialog.source = group?.source || "引用原文";
+  sourceDialog.kbName = group?.kb_name || "";
   sourceDialog.items = (group?.excerpts || []).map((item) => ({
     ...item,
     chunk_id: sourceId(item.chunk_id), file_id: sourceId(item.file_id),
@@ -105,7 +126,7 @@ async function openSourceDialog(source) {
 }
 const msgListRef = ref(null);
 
-const canSend = computed(() => Boolean(input.value.trim() && selectedKb.value && !sending.value));
+const canSend = computed(() => Boolean(input.value.trim() && hasAvailableContent.value && !sending.value));
 function scrollBottom() {
   nextTick(() => {
     const el = msgListRef.value;
@@ -133,6 +154,11 @@ function handleUnauthorized(message) {
   router.replace("/login");
 }
 
+async function refreshAccess() {
+  // 刷新授权不会切换当前会话，避免覆盖仍在显示的回答或历史。
+  await Promise.allSettled([loadKnowledgeBases(), refreshUser()]);
+}
+
 async function selectConversation(id) {
   if (!id) {
     messages.value = [];
@@ -153,6 +179,7 @@ async function selectConversation(id) {
     const message = requestErrorMessage(error.response?.status, error.response?.data?.detail);
     if (error.response?.status === 401) handleUnauthorized(message);
     else if (currentConversationId.value === id) ElMessage.error(message);
+    if ([403, 404].includes(error.response?.status)) await refreshAccess();
   }
 }
 
@@ -172,8 +199,8 @@ watch(currentConversationId, (id) => {
 
 async function send() {
   const content = input.value.trim();
-  if (!selectedKb.value) {
-    ElMessage.warning("请先选择知识库");
+  if (!hasAvailableContent.value) {
+    ElMessage.warning(knowledgeBases.value.length ? "当前范围暂无可用文档，请联系管理员上传" : "暂无可访问的知识库，请联系管理员分配角色");
     return;
   }
   if (!content || sending.value || !token.value) return;
@@ -213,8 +240,6 @@ async function send() {
       try { detail = (await res.json()).detail; } catch { /* 使用状态码兜底。 */ }
       throw Object.assign(new Error(requestErrorMessage(res.status, detail)), { status: res.status });
     }
-    const conv = conversations.value.find((item) => item.id === convId);
-    if (conv && !conv.kb_id) conv.kb_id = kbId;
     if (currentConversationId.value === convId) selectedKb.value = kbId;
     if (!res.body) throw new Error("服务返回空响应，请稍后重试");
     reader = res.body.getReader();
@@ -238,6 +263,7 @@ async function send() {
           assistant.sources = normalizeSources(evt.sources);
         } else if (evt.type === "error") {
           assistant.content += `\n[错误] ${evt.message}`;
+          if ([403, 404].includes(evt.status) || evt.code === "permission_revoked") await refreshAccess();
         } else if (evt.type === "done") {
           completed = true;
           break;
@@ -257,6 +283,7 @@ async function send() {
       input.value = content;
       ElMessage.error(message);
     }
+    if (status === 403 || status === 404) await refreshAccess();
   } finally {
     clearInterval(thinkingTimer);
     if (reader) await reader.cancel().catch(() => {});
@@ -283,7 +310,7 @@ async function send() {
       <div ref="msgListRef" class="msg-list">
         <div v-if="!messages.length" class="chat-welcome">
           <h2 class="welcome-title">有什么可以帮您？</h2>
-          <p class="welcome-desc">{{ currentConversationId ? '输入问题，AI 将基于所选知识库为您解答' : '选择上方知识库后输入问题，AI 将基于文档内容为您解答' }}</p>
+          <p class="welcome-desc">{{ currentConversationId ? '输入问题，AI 将基于本次会话的知识库范围为您解答' : '直接提问，AI 将检索全部可访问知识库；也可在左下角限定范围' }}</p>
         </div>
         <div
           v-for="(msg, i) in messages"
@@ -316,6 +343,7 @@ async function send() {
               >
                 <span class="source-label">
                   {{ s.source }}<span v-if="s.count > 1" class="source-count"> ×{{ s.count }}</span>
+                  <span v-if="s.kb_name" class="source-extra">{{ s.kb_name }}</span>
                   <span v-if="s.file_type" class="source-extra">{{ s.file_type }}</span>
                 </span>
               </el-tag>
@@ -325,26 +353,58 @@ async function send() {
       </div>
 
       <div class="input-area">
-        <el-input
-          v-model="input"
-          type="textarea"
-          :rows="3"
-          :disabled="sending"
-          :placeholder="selectedKb ? '输入问题，Ctrl+Enter 发送' : '请先选择知识库'"
-          @keydown.ctrl.enter.prevent="send"
-        />
-        <el-button
-          type="primary"
-          :loading="sending"
-          :icon="Promotion"
-          :disabled="!canSend"
-          @click="send"
-        >
-          发送
-        </el-button>
+        <div class="composer">
+          <el-input
+            v-model="input"
+            class="composer-input"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 8 }"
+            resize="none"
+            :disabled="sending"
+            aria-label="问题输入"
+            :placeholder="knowledgeBases.length ? '输入问题，Ctrl+Enter 发送' : '暂无可访问的知识库，请联系管理员'"
+            @keydown.ctrl.enter.prevent="send"
+          />
+          <div class="composer-toolbar">
+            <el-tooltip content="会话范围已固定，切换范围请新建对话" placement="top" :disabled="!kbLocked">
+              <div class="kb-control">
+                <el-select
+                  :model-value="selectedKb ?? 'all'"
+                  @update:model-value="selectScope"
+                  class="composer-kb-select"
+                  :disabled="kbLocked || sending"
+                  aria-label="选择知识库"
+                  placeholder="全部可访问知识库"
+                >
+                  <template #prefix><el-icon><Collection /></el-icon></template>
+                  <el-option label="全部可访问知识库" value="all" />
+                  <el-option
+                    v-for="kb in knowledgeBases"
+                    :key="kb.id"
+                    :label="kbLabel(kb)"
+                    :value="kb.id"
+                    :disabled="!kbSelectable(kb)"
+                  />
+                </el-select>
+              </div>
+            </el-tooltip>
+            <el-button
+              class="composer-send"
+              type="primary"
+              circle
+              :loading="sending"
+              :icon="Top"
+              :disabled="!canSend"
+              :aria-label="sending ? '正在发送' : '发送'"
+              :title="sending ? '正在生成回答' : '发送（Ctrl+Enter）'"
+              @click="send"
+            />
+          </div>
+        </div>
       </div>
 
       <el-dialog v-model="sourceDialog.visible" :title="sourceDialog.source" width="min(840px, calc(100vw - 32px))">
+        <p v-if="sourceDialog.kbName" class="source-note">知识库：{{ sourceDialog.kbName }}</p>
         <div v-for="(item, position) in sourceDialog.items" :key="position" class="source-item">
           <div class="source-item-title">
             来源{{ item.index ?? position + 1 }}
@@ -560,13 +620,83 @@ async function send() {
 }
 
 .input-area {
+  flex-shrink: 0;
+  padding: 12px 24px 24px;
+}
+
+.composer {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 14px 16px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  background: var(--color-surface-solid);
+  box-shadow: var(--shadow-dialog);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.composer:focus-within {
+  border-color: var(--color-border-accent);
+  box-shadow: 0 0 0 3px var(--color-primary-soft), var(--shadow-dialog);
+}
+
+.composer-input :deep(.el-textarea__inner) {
+  padding: 4px 6px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.composer-input :deep(.el-textarea__inner:focus),
+.composer-input :deep(.el-textarea__inner:hover) {
+  box-shadow: none;
+}
+
+.composer-toolbar {
   display: flex;
-  gap: 10px;
-  padding: 14px 24px 18px;
-  border-top: 1px solid var(--color-border);
-  align-items: flex-end;
-  background: rgba(255, 255, 255, 0.66);
-  backdrop-filter: blur(18px);
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.kb-control {
+  flex: 0 1 260px;
+  min-width: 0;
+}
+
+.composer-kb-select {
+  width: 100%;
+}
+
+.composer-kb-select :deep(.el-select__wrapper) {
+  min-height: 36px;
+  padding: 4px 12px;
+  border-radius: 18px;
+  background: var(--color-surface-solid);
+}
+
+.composer-send {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  margin-left: auto;
+  font-size: 22px;
+}
+
+@media (max-width: 640px) {
+  .input-area {
+    padding: 10px 12px 16px;
+  }
+
+  .composer {
+    padding: 12px;
+    border-radius: var(--radius-xl);
+  }
 }
 
 .thinking {

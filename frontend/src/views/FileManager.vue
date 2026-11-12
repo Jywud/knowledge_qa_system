@@ -17,7 +17,7 @@ const chunks = ref([]);
 const currentFile = ref(null);
 const expandedChunks = ref({});
 
-const isAdmin = computed(() => user.value?.role === "admin");
+const isAdmin = computed(() => user.value?.is_admin === true);
 const currentKbName = computed(
   () => knowledgeBases.value.find((kb) => kb.id === selectedKb.value)?.name ?? "文件管理"
 );
@@ -209,6 +209,7 @@ const STATUS_META = {
               分块
             </el-button>
             <el-upload
+              v-if="isAdmin"
               :show-file-list="false"
               :http-request="(opt) => updateFile(opt, row)"
               accept=".md,.docx,.pdf,.txt"

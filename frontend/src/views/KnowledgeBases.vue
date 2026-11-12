@@ -16,10 +16,27 @@ import { api, knowledgeBases, loadKnowledgeBases, user } from "../store";
 const router = useRouter();
 const search = ref("");
 const dialog = ref(false);
+const accessDialog = ref(false);
+const accessRoles = ref([]);
+const accessName = ref("");
+const accessLoading = ref(false);
+let accessRequest = 0;
+async function showRoles(kb) {
+  const request = ++accessRequest;
+  accessName.value = kb.name;
+  accessRoles.value = [];
+  accessLoading.value = true;
+  accessDialog.value = true;
+  try {
+    const { data } = await api.get(`/knowledge-bases/${kb.id}/roles`);
+    if (request === accessRequest) accessRoles.value = data;
+  } catch (e) { ElMessage.error(e.response?.data?.detail || "加载授权角色失败"); }
+  finally { if (request === accessRequest) accessLoading.value = false; }
+}
 const editingId = ref(null);
 const form = reactive({ name: "", description: "" });
 
-const isAdmin = () => user.value?.role === "admin";
+const isAdmin = () => user.value?.is_admin === true;
 
 async function load() {
   await loadKnowledgeBases(search.value);
@@ -113,12 +130,22 @@ onMounted(load);
         <div class="kb-actions">
           <el-button size="small" type="primary" :icon="FolderOpened" @click="enter(kb)">进入</el-button>
           <template v-if="isAdmin()">
+            <el-button size="small" @click="showRoles(kb)">授权角色</el-button>
             <el-button size="small" :icon="Edit" @click="openEdit(kb)">编辑</el-button>
             <el-button size="small" type="danger" plain :icon="Delete" @click="remove(kb)">删除</el-button>
           </template>
         </div>
       </el-card>
     </div>
+
+    <el-dialog v-model="accessDialog" :title="`授权角色 - ${accessName}`" width="480px">
+      <div v-loading="accessLoading">
+        <p>角色授权请前往角色管理调整。系统管理员始终可访问全部知识库。</p>
+        <el-tag v-for="role in accessRoles" :key="role.id" :type="role.system_key ? 'warning' : 'info'" style="margin: 4px">{{ role.name }}</el-tag>
+        <el-empty v-if="!accessLoading && !accessRoles.length" description="暂无授权业务角色" />
+      </div>
+      <template #footer><el-button @click="accessDialog = false">关闭</el-button></template>
+    </el-dialog>
 
     <el-dialog v-model="dialog" :title="editingId ? '编辑知识库' : '创建知识库'" width="440px">
       <el-form label-width="70px">
@@ -162,6 +189,7 @@ onMounted(load);
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .kb-icon {
@@ -192,5 +220,6 @@ onMounted(load);
 .kb-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 </style>

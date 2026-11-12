@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import AppLayout from "../components/AppLayout.vue";
-import { token } from "../store";
+import { token, user, refreshUser, clearAuth } from "../store";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -13,8 +13,9 @@ const router = createRouter({
         { path: "chat", component: () => import("../views/ChatView.vue") },
         { path: "knowledge-bases", component: () => import("../views/KnowledgeBases.vue") },
         { path: "files", component: () => import("../views/FileManager.vue") },
-        { path: "users", component: () => import("../views/UserManage.vue") },
-        { path: "settings", component: () => import("../views/SystemSettings.vue") },
+        { path: "roles", meta: { admin: true }, component: () => import("../views/RoleManage.vue") },
+        { path: "users", meta: { admin: true }, component: () => import("../views/UserManage.vue") },
+        { path: "settings", meta: { admin: true }, component: () => import("../views/SystemSettings.vue") },
       ],
     },
     { path: "/home", component: () => import("../views/HomeView.vue") },
@@ -22,10 +23,15 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const isLogin = !!token.value;
   if (to.path === "/login") return isLogin ? "/chat" : true;
-  return isLogin ? true : "/login";
+  if (!isLogin) return "/login";
+  if (!user.value) {
+    try { await refreshUser(); } catch { clearAuth(); return "/login"; }
+  }
+  if (to.meta.admin && !user.value?.is_admin) return "/chat";
+  return true;
 });
 
 export default router;

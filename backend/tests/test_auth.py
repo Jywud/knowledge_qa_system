@@ -12,7 +12,7 @@ async def test_login_success(client):
     data = resp.json()
     assert "token" in data
     assert data["user"]["username"] == "admin"
-    assert set(data["user"]) == {"id", "username", "role"}
+    assert set(data["user"]) == {"id", "username", "roles", "is_admin"}
 
 
 @pytest.mark.asyncio

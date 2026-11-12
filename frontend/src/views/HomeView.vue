@@ -32,7 +32,7 @@ function openConversation(id) {
 }
 
 function kbName(kbId) {
-  if (!kbId) return "全部知识库";
+  if (!kbId) return "全部可访问知识库";
   return knowledgeBases.value.find((kb) => kb.id === kbId)?.name ?? "未知知识库";
 }
 
@@ -58,7 +58,7 @@ onMounted(async () => {
         <div class="hero-text">
           <span class="pill">✦ 企业知识问答平台</span>
           <h1>把分散的知识<br />变成 <span class="highlight">一次提问</span></h1>
-          <p>从制度手册到技术文档，统一入库、智能检索、流式回答。支持多知识库切换与完整对话记忆。</p>
+          <p>从制度手册到技术文档，统一入库、智能检索、流式回答。支持跨授权知识库问答与完整对话记忆。</p>
           <div class="actions">
             <button class="btn primary" type="button" @click="goChat"><el-icon><ChatDotRound /></el-icon>立即开始</button>
             <button class="btn ghost" type="button" @click="goKnowledgeBases"><el-icon><FolderOpened /></el-icon>查看知识库</button>
@@ -89,7 +89,7 @@ onMounted(async () => {
         <div class="feature">
           <div class="icon"><el-icon><Grid /></el-icon></div>
           <h3>多库隔离</h3>
-          <p>不同知识库独立入库与召回，问答范围始终清晰。</p>
+          <p>不同知识库独立入库，在授权范围内联合检索，也可限定单库提问。</p>
         </div>
         <div class="feature">
           <div class="icon">⚡</div>

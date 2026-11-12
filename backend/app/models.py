@@ -1,7 +1,7 @@
 import datetime as dt
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -13,7 +13,6 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True)
-    role: Mapped[str] = mapped_column(String(16), default="user")
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -26,6 +25,37 @@ class KnowledgeBase(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Role(Base):
+    __tablename__ = "roles"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    system_key: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class UserRole(Base):
+    __tablename__ = "user_roles"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="RESTRICT"), primary_key=True, index=True)
+
+
+class RoleKnowledgeBase(Base):
+    __tablename__ = "role_knowledge_bases"
+
+    role_id: Mapped[int] = mapped_column(ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True)
+    kb_id: Mapped[int] = mapped_column(ForeignKey("knowledge_bases.id", ondelete="CASCADE"), primary_key=True, index=True)
+
+
+class SchemaMigration(Base):
+    __tablename__ = "schema_migrations"
+
+    version: Mapped[str] = mapped_column(String(64), primary_key=True)
+    applied_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class FileRecord(Base):
@@ -64,6 +94,10 @@ class Conversation(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     title: Mapped[str] = mapped_column(String(255), default="新对话")
     kb_id: Mapped[int | None] = mapped_column(ForeignKey("knowledge_bases.id"), nullable=True)
+    memory_epoch: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
+    kb_scope: Mapped[str | None] = mapped_column(Text, nullable=True)
+    memory_thread_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    rbac_ready: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("false"))
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, server_default=func.now())
 
 

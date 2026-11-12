@@ -7,22 +7,22 @@ export const token = ref(localStorage.getItem("kqa_token") || "");
 
 function publicUser(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return { id: value.id, username: value.username, role: value.role };
+  return {
+    id: value.id, username: value.username, is_admin: value.is_admin === true,
+    roles: Array.isArray(value.roles) ? value.roles.map(({ id, name, system_key }) => ({ id, name, system_key })) : [],
+  };
 }
 
-function readStoredUser() {
-  try {
-    const value = publicUser(JSON.parse(localStorage.getItem("kqa_user") || "null"));
-    if (value) localStorage.setItem("kqa_user", JSON.stringify(value));
-    else localStorage.removeItem("kqa_user");
-    return value;
-  } catch {
-    localStorage.removeItem("kqa_user");
-    return null;
-  }
-}
+// 浏览器缓存不能作为权限来源；启动后通过 /auth/me 重新确认身份。
+localStorage.removeItem("kqa_user");
+export const user = ref(null);
 
-export const user = ref(readStoredUser());
+export async function refreshUser() {
+  const { data } = await api.get("/auth/me");
+  user.value = publicUser(data);
+  localStorage.setItem("kqa_user", JSON.stringify(user.value));
+  return user.value;
+}
 
 export const conversations = ref([]);
 
@@ -58,6 +58,7 @@ export function clearAuth() {
   conversations.value = [];
   currentConversationId.value = null;
   selectedKb.value = null;
+  knowledgeBases.value = [];
   localStorage.removeItem("kqa_token");
   localStorage.removeItem("kqa_user");
 }
@@ -72,4 +73,7 @@ export async function loadKnowledgeBases(name = "") {
   if (!token.value) return;
   const res = await api.get("/knowledge-bases", { params: name ? { name } : {} });
   knowledgeBases.value = res.data;
+  if (!name && selectedKb.value && !res.data.some((kb) => kb.id === selectedKb.value)) {
+    selectedKb.value = null;
+  }
 }

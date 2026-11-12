@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
 from app.models import User
+from app.services.permission_service import is_system_admin
 
 
 def validate_username(username: str) -> str:
@@ -83,7 +84,7 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
     return user
 
 
-async def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role != "admin":
+async def require_admin(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> User:
+    if not await is_system_admin(db, user.id):
         raise HTTPException(403, "仅管理员可执行该操作")
     return user

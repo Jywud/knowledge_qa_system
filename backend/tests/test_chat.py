@@ -91,8 +91,9 @@ async def test_history_readable_without_usable_kb(client, admin_token, test_db, 
     conv_id = await seed_conversation(test_db, kb_id=kb_id)
     response = await client.get(f"/api/conversations/{conv_id}/messages",
                                 headers={"Authorization": f"Bearer {admin_token}"})
-    assert response.status_code == 200
-    assert response.json()[0]["content"] == "已有历史"
+    assert response.status_code == (200 if kb_id else 404)
+    if kb_id:
+        assert response.json()[0]["content"] == "已有历史"
 
 
 async def test_history_still_rejects_other_users_conversation(client, admin_token, test_db):
@@ -102,7 +103,7 @@ async def test_history_still_rejects_other_users_conversation(client, admin_toke
     assert response.status_code == 404
 
 
-@pytest.mark.parametrize("body,status", [({}, 400), ({"kb_id": None}, 400), ({"kb_id": 0}, 400),
+@pytest.mark.parametrize("body,status", [({"kb_id": 0}, 400),
                                          ({"kb_id": -1}, 400), ({"kb_id": 999}, 404)])
 async def test_create_conversation_rejects_invalid_kb(client, admin_token, test_db, body, status):
     response = await client.post("/api/conversations", json=body,
@@ -121,7 +122,7 @@ async def test_create_conversation_accepts_existing_empty_kb(client, admin_token
 
 
 @pytest.mark.parametrize("scenario,status", [
-    ("unbound", 400), ("missing_kb", 404), ("empty_kb", 400),
+    ("unbound", 404), ("missing_kb", 400), ("empty_kb", 400),
     ("switch_kb", 400), ("blank_question", 400), ("invalid_binding", 400),
 ])
 async def test_chat_validation_has_no_side_effects(
@@ -150,16 +151,10 @@ async def test_chat_validation_has_no_side_effects(
         assert (await db.scalars(select(Message.content).where(Message.conversation_id == conv_id))).all() == ["已有历史"]
 
 
-@pytest.mark.parametrize("legacy", [False, True])
-async def test_valid_chat_streams_and_binds_legacy_conversation_once(
-    client, admin_token, test_db, chat_graph, legacy,
+async def test_valid_bound_chat_streams(
+    client, admin_token, test_db, chat_graph,
 ):
     conv_id = await seed_conversation(test_db, with_chunks=True)
-    if legacy:
-        async with test_db() as db:
-            conv = await db.get(Conversation, conv_id)
-            conv.kb_id = None
-            await db.commit()
     response = await client.post(
         f"/api/conversations/{conv_id}/chat", json={"content": "测试问题", "kb_id": 1},
         headers={"Authorization": f"Bearer {admin_token}"},

@@ -11,6 +11,7 @@ from app.models import User
 from app.auth import hash_password, validate_new_password
 from app.audit import log_audit
 from app.schemas import LoginOut, LoginRequest, PasswordChangeRequest, UserOut
+from app.services.permission_service import public_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -65,12 +66,12 @@ async def login(body: LoginRequest, request: Request, response: Response, db: As
         raise HTTPException(400, "用户名或密码错误")
     # 成功登录不清共享来源的失败预算，避免用已知账号重置猜密次数。
     response.headers["Cache-Control"] = "no-store"
-    return {"token": create_token(user), "user": user}
+    return {"token": create_token(user), "user": await public_user(db, user)}
 
 
 @router.get("/me", response_model=UserOut)
-async def me(user: User = Depends(get_current_user)):
-    return user
+async def me(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    return await public_user(db, user)
 
 
 @router.put("/password")

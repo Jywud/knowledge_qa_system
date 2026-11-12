@@ -12,6 +12,7 @@ RAG_SYSTEM_PROMPT = """你是企业知识库问答助手。请严格依据下面
 - 只使用知识库内容作答，不要基于常识补充知识库中不存在的信息。
 - 如果知识库内容与问题无关或不足以回答，直接说明知识库中没有相关内容，不要编造答案。
 - 只有在回答中实际引用了知识库内容时才标注来源编号，例如 [来源1]；没有引用时不要输出来源标注。
+- 不同知识库或文档的说法矛盾时，分别说明各自来源，不要把冲突内容合并成一个确定结论。
 - 用中文回答，保持简洁专业。
 
 知识库内容：
@@ -46,6 +47,8 @@ class ChatState(TypedDict):
     top_k: int | None
     summary: str
     summarized_count: int
+    user_id: int
+    kb_ids: list[int]
 
 
 def build_llm() -> ChatOpenAI:
@@ -131,10 +134,8 @@ def make_chat_node(llm: ChatOpenAI):
         query = extract_text(state["messages"][-1].content)
         kb_id = state.get("kb_id")
         top_k = state.get("top_k") or settings.top_k
-        if kb_id:
-            docs = await hybrid_search(query, int(kb_id), top_k)
-        else:
-            docs = await hybrid_search(query, None, top_k)
+        docs = await hybrid_search(query, int(kb_id) if kb_id else None, top_k,
+                                   user_id=state.get("user_id"), kb_ids=state.get("kb_ids"))
         sources = [
             {
                 "index": i + 1,
@@ -146,11 +147,14 @@ def make_chat_node(llm: ChatOpenAI):
                 "chunk_index": d.metadata.get("chunk_index"),
                 "file_type": d.metadata.get("file_type", ""),
                 "kb_name": d.metadata.get("kb_name", ""),
+                "kb_id": d.metadata.get("kb_id"),
                 "excerpt": d.page_content[:150].replace("\n", " ") + ("…" if len(d.page_content) > 150 else ""),
             }
             for i, d in enumerate(docs)
         ]
-        context = "\n\n".join(f"[来源{i + 1}] {d.page_content}" for i, d in enumerate(docs))
+        context = "\n\n".join(
+            f"[来源{i + 1}] 知识库：{d.metadata.get('kb_name', '')}；文档：{d.metadata.get('source', '')}\n{d.page_content}"
+            for i, d in enumerate(docs))
         if not docs:
             context = "（知识库中暂无相关内容）"
         system = SystemMessage(content=RAG_SYSTEM_PROMPT.format(context=context))

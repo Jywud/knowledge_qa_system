@@ -14,6 +14,8 @@ function createSubject({ response, createError, fetchError, existing = true } = 
   const currentConversationId = ref(existing ? 23 : null);
   const conversations = ref([]);
   let refreshes = 0;
+  let accessRefreshes = 0;
+  const selectedKb = ref(1);
   let requests = 0;
   let sentBody;
   const watchers = [];
@@ -26,7 +28,10 @@ function createSubject({ response, createError, fetchError, existing = true } = 
       if (createError) throw createError;
       return { data: { id: 24, kb_id: 1, title: "" } };
     }, get: async () => ({ data: [] }) },
-    conversations, currentConversationId, token, selectedKb: ref(1),
+    conversations, currentConversationId, token, selectedKb,
+    knowledgeBases: ref([{ id: 1, chunk_count: 1 }]),
+    refreshUser: async () => {},
+    loadKnowledgeBases: async () => { accessRefreshes++; selectedKb.value = null; },
     loadConversations: async () => { refreshes++; },
     clearAuth: () => { token.value = ""; currentConversationId.value = null; conversations.value = []; },
     useRouter: () => ({ replace: async (path) => navigations.push(path) }),
@@ -40,9 +45,9 @@ function createSubject({ response, createError, fetchError, existing = true } = 
   };
   vm.createContext(box);
   vm.runInContext(script, box);
-  const state = vm.runInContext("({send, selectConversation, input, sending, messages})", box);
+  const state = vm.runInContext("({send, selectConversation, input, sending, messages, canSend})", box);
   state.input.value = "测试问题";
-  return { ...state, token, currentConversationId, notices, navigations,
+  return { ...state, token, selectedKb, knowledgeBases: box.knowledgeBases, accessRefreshes: () => accessRefreshes, currentConversationId, notices, navigations,
     refreshes: () => refreshes, requests: () => requests, sentBody: () => sentBody,
     flushWatchers: async () => {
       for (const [target, callback] of watchers) {
@@ -50,6 +55,26 @@ function createSubject({ response, createError, fetchError, existing = true } = 
       }
     } };
 }
+
+test("默认全部授权知识库，无须先选择即可提问", async () => {
+  const subject = createSubject({ existing: false });
+  subject.selectedKb.value = null;
+  assert.equal(subject.canSend.value, true);
+  await subject.send();
+  assert.equal(subject.requests(), 1);
+  assert.equal(subject.sentBody().kb_id, null);
+});
+
+test("没有可访问知识库时禁止默认提问并保留输入", async () => {
+  const subject = createSubject({ existing: false });
+  subject.selectedKb.value = null;
+  subject.knowledgeBases.value = [];
+  assert.equal(subject.canSend.value, false);
+  await subject.send();
+  assert.equal(subject.requests(), 0);
+  assert.equal(subject.input.value, "测试问题");
+  assert.match(subject.notices[0], /分配角色/);
+});
 
 for (const status of [400, 403, 404, 429, 500]) {
   test("HTTP " + status + " 显示后端错误且恢复发送", async () => {
@@ -114,7 +139,7 @@ test("部分回答后无 done 的 EOF 显示中断而不伪装完成", async () 
   assert.equal(subject.sending.value, false);
 });
 
-test("提问携带选定知识库，供旧会话首次绑定", async () => {
+test("提问携带选定知识库供服务端校验绑定", async () => {
   const subject = createSubject();
   await subject.send();
   assert.equal(subject.sentBody().kb_id, 1);
@@ -126,4 +151,21 @@ test("新会话错误不会被切换会话时的空历史覆盖", async () => {
   await subject.flushWatchers();
   assert.equal(subject.messages.value.length, 2);
   assert.match(subject.messages.value[1].content, /知识库暂无可用文档/);
+});
+
+for (const status of [403,404]) {
+ test("权限失败刷新知识库且保留本次错误回复 " + status,async()=>{
+  const s=createSubject({response:new Response('{"detail":"知识库不可访问"}',{status})});
+  await s.send();
+  assert.equal(s.accessRefreshes(),1); assert.equal(s.selectedKb.value,null);
+  assert.match(s.messages.value[1].content,/知识库不可访问/);
+ });
+}
+
+test("在途撤权保留部分回复和错误并刷新授权",async()=>{
+ const s=createSubject({response:new Response('data: {"type":"token","content":"部分内容"}\n\ndata: {"type":"error","status":403,"code":"permission_revoked","message":"知识库权限已变更，回答已停止"}\n\ndata: {"type":"done"}\n\n')});
+ await s.send();
+ assert.match(s.messages.value[1].content,/部分内容/); assert.match(s.messages.value[1].content,/权限已变更/);
+ assert.equal(s.accessRefreshes(),1); assert.equal(s.selectedKb.value,null);
+ assert.equal(s.sending.value,false);
 });

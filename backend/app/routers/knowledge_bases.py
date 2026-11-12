@@ -7,8 +7,10 @@ from app.auth import get_current_user, require_admin
 from app.audit import log_audit
 from app.database import get_db
 from app.config import BASE_DIR, settings
-from app.models import Chunk, Conversation, FileRecord, KnowledgeBase, User
-from app.schemas import KnowledgeBaseCreate, KnowledgeBaseOut, KnowledgeBaseUpdate
+from app.models import Chunk, Conversation, FileRecord, KnowledgeBase, Role, RoleKnowledgeBase, User
+from app.schemas import KnowledgeBaseCreate, KnowledgeBaseOut, KnowledgeBaseUpdate, RoleOut
+from app.routers.roles import role_out
+from app.services.permission_service import readable_kb_predicate
 from app.services.document_service import delete_file_uploads, delete_file_vectors
 
 router = APIRouter(prefix="/api/knowledge-bases", tags=["knowledge-bases"])
@@ -40,12 +42,24 @@ async def list_knowledge_bases(
         .outerjoin(FileRecord, FileRecord.kb_id == KnowledgeBase.id)
         .outerjoin(Chunk, Chunk.file_id == FileRecord.id)
         .group_by(KnowledgeBase.id)
+        .where(readable_kb_predicate(KnowledgeBase.id, user.id))
         .order_by(KnowledgeBase.id.desc())
     )
     if name:
         stmt = stmt.where(KnowledgeBase.name.ilike(f"%{name}%"))
     result = await db.execute(stmt)
     return [_kb_out(kb, file_count, chunk_count) for kb, file_count, chunk_count in result.all()]
+
+
+@router.get("/{kb_id}/roles", response_model=list[RoleOut])
+async def get_kb_roles(kb_id: int, admin: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    if not await db.get(KnowledgeBase, kb_id):
+        raise HTTPException(404, "知识库不存在")
+    roles = (await db.scalars(select(Role).where(
+        (Role.system_key == "system_admin") | Role.id.in_(
+            select(RoleKnowledgeBase.role_id).where(RoleKnowledgeBase.kb_id == kb_id)))
+        .order_by(Role.id))).all()
+    return [await role_out(db, role) for role in roles]
 
 
 @router.post("", response_model=KnowledgeBaseOut)
@@ -109,6 +123,10 @@ async def delete_knowledge_base(
     )
     if conversation_id is not None:
         raise HTTPException(409, "知识库仍有关联会话，请先删除相关会话后再删除知识库")
+    from app.services.conversation_scope_service import conversation_kb_ids
+    multi = (await db.scalars(select(Conversation).where(Conversation.kb_id.is_(None)))).all()
+    if any(kb_id in conversation_kb_ids(conv) for conv in multi):
+        raise HTTPException(409, "知识库仍有关联的跨库会话，请先删除相关会话后再删除知识库")
     files = (
         await db.execute(
             select(FileRecord).where(FileRecord.kb_id == kb_id)

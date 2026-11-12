@@ -7,14 +7,15 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from app.database import Base, get_db
 from app.auth import hash_password
 from app.routers.auth import _login_attempts
-from app.models import KnowledgeBase, SystemSetting, User
+from app.models import KnowledgeBase, Role, RoleKnowledgeBase, SchemaMigration, SystemSetting, User, UserRole
 from app.main import app
 
 
 @pytest.fixture(autouse=True)
 async def test_db(tmp_path, monkeypatch):
     _login_attempts.clear()
-    engine = create_async_engine("sqlite+aiosqlite://", echo=False)
+    # 流生成与撤权检查使用独立事务，不能共用内存库的单个连接。
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'test.db'}", echo=False)
 
     @event.listens_for(engine.sync_engine, "connect")
     def enable_foreign_keys(connection, _record):
@@ -35,10 +36,16 @@ async def test_db(tmp_path, monkeypatch):
 
     async with session_factory() as session:
         session.add(SystemSetting(id=1))
-        session.add(User(username="admin", role="admin", password_hash=hash_password("123456")))
-        session.add(User(username="alice", role="user", password_hash=hash_password("pass1")))
+        session.add(User(username="admin", password_hash=hash_password("123456")))
+        session.add(User(username="alice", password_hash=hash_password("pass1")))
+        session.add(Role(id=1, name="系统管理员", system_key="system_admin"))
+        session.add(Role(id=2, name="测试角色"))
+        session.add(SchemaMigration(version="roles_v1"))
         await session.commit()
         session.add(KnowledgeBase(name="测试库", description="", created_by=1))
+        await session.commit()
+        session.add_all([UserRole(user_id=1, role_id=1), UserRole(user_id=2, role_id=2),
+                         RoleKnowledgeBase(role_id=2, kb_id=1)])
         await session.commit()
 
     try:

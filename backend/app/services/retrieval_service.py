@@ -3,10 +3,12 @@ import re
 from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
 from sqlalchemy import select, text
+from fastapi import HTTPException
 
 from app.models import Chunk, FileRecord, KnowledgeBase
 from app.services.document_service import get_embeddings
 from app.config import settings
+from app.services.permission_service import readable_kb_predicate
 
 CHINESE_STOP_CHARS = set("的了在是我有和就不人都一为大上个子中会说要到你们会着没好给这那也时等与及或对其把被让从向而并但因此于由之一二三四五六七八九十什么吗呢吧啊哪些")
 
@@ -55,10 +57,23 @@ def _merge_candidates(vector_docs: list[Document], keyword_docs: list[Document],
     return [docs[key] for key in ordered_keys[:limit]]
 
 
-async def _vector_search(query_vector: list[float], kb_id: int | None, limit: int) -> list[Document]:
+def _require_context(kb_id: int | None, user_id: int | None, kb_ids: list[int] | None = None) -> None:
+    if not isinstance(user_id, int) or isinstance(user_id, bool) or user_id <= 0:
+        raise HTTPException(401, "检索缺少认证用户")
+    if kb_id is not None and (type(kb_id) is not int or kb_id <= 0):
+        raise HTTPException(400, "知识库范围无效")
+    if kb_ids is not None and (not isinstance(kb_ids, list) or not kb_ids or any(
+        type(value) is not int or value <= 0 for value in kb_ids
+    )):
+        raise HTTPException(400, "会话检索范围无效")
+
+
+async def _vector_search(query_vector: list[float], kb_id: int | None, limit: int, *, user_id: int | None = None,
+                         kb_ids: list[int] | None = None) -> list[Document]:
     from app.database import SessionLocal
 
-    params: dict = {"qv": str(query_vector), "k": limit}
+    _require_context(kb_id, user_id, kb_ids)
+    params: dict = {"qv": str(query_vector), "k": limit, "user_id": user_id}
     statement = """
         SELECT c.id AS chunk_id, c.file_id, c.chunk_index, c.page_no, c.content,
                f.kb_id, f.filename, f.file_type, f.created_at, f.version AS file_version,
@@ -67,10 +82,17 @@ async def _vector_search(query_vector: list[float], kb_id: int | None, limit: in
         JOIN files f ON f.id = c.file_id
         JOIN knowledge_bases kb ON kb.id = f.kb_id
         WHERE c.embedding IS NOT NULL
+          AND (EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+                       WHERE ur.user_id = :user_id AND r.system_key = 'system_admin')
+               OR EXISTS (SELECT 1 FROM user_roles ur JOIN role_knowledge_bases rk ON rk.role_id = ur.role_id
+                          WHERE ur.user_id = :user_id AND rk.kb_id = f.kb_id))
     """
     if kb_id:
         statement += " AND f.kb_id = :kb_id"
         params["kb_id"] = kb_id
+    if kb_ids is not None:
+        statement += " AND f.kb_id = ANY(CAST(:kb_ids AS INTEGER[]))"
+        params["kb_ids"] = kb_ids
     max_distance = 1 - settings.retrieval_min_score
     statement += " AND c.embedding <=> CAST(:qv AS vector) <= :max_distance"
     params["max_distance"] = max_distance
@@ -104,9 +126,11 @@ def _bm25_search(query: str, rows: list, limit: int) -> list[Document]:
     return results
 
 
-async def hybrid_search(query: str, kb_id: int | None, top_k: int) -> list[Document]:
+async def hybrid_search(query: str, kb_id: int | None, top_k: int, *, user_id: int | None = None,
+                        kb_ids: list[int] | None = None) -> list[Document]:
     from app.database import SessionLocal
 
+    _require_context(kb_id, user_id, kb_ids)
     candidate_k = max(top_k * 2, 10)
     async with SessionLocal() as db:
         sql_statement = (
@@ -126,15 +150,21 @@ async def hybrid_search(query: str, kb_id: int | None, top_k: int) -> list[Docum
             .join(FileRecord, FileRecord.id == Chunk.file_id)
             .join(KnowledgeBase, KnowledgeBase.id == FileRecord.kb_id)
             .order_by(Chunk.id)
+            .where(readable_kb_predicate(FileRecord.kb_id, user_id))
         )
         if kb_id:
             sql_statement = sql_statement.where(FileRecord.kb_id == kb_id)
+        if kb_ids is not None:
+            sql_statement = sql_statement.where(FileRecord.kb_id.in_(kb_ids))
         result = await db.execute(sql_statement)
         rows = result.all()
 
+    if not rows:
+        return []
+
     try:
         query_vector = await get_embeddings().aembed_query(query)
-        vector_docs = await _vector_search(query_vector, kb_id, candidate_k)
+        vector_docs = await _vector_search(query_vector, kb_id, candidate_k, user_id=user_id, kb_ids=kb_ids)
     except Exception:
         vector_docs = None
     if vector_docs is None:

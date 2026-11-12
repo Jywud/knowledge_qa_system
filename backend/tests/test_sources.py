@@ -30,7 +30,7 @@ async def test_keyword_retrieval_keeps_reference_identity(test_db, monkeypatch):
         chunk_id = chunk.id
     provider = SimpleNamespace(aembed_query=AsyncMock(side_effect=RuntimeError("offline")))
     monkeypatch.setattr(retrieval_service, "get_embeddings", lambda: provider)
-    docs = await retrieval_service.hybrid_search("needle", 1, 5)
+    docs = await retrieval_service.hybrid_search("needle", 1, 5, user_id=1)
     assert len(docs) == 1
     assert str(docs[0].metadata["chunk_id"]) == str(chunk_id)
     assert docs[0].metadata["file_version"] == 3
@@ -50,7 +50,7 @@ async def test_vector_query_selects_reference_identity(monkeypatch):
             pass
 
     monkeypatch.setattr("app.database.SessionLocal", Session)
-    docs = await retrieval_service._vector_search([0.1], 1, 5)
+    docs = await retrieval_service._vector_search([0.1], 1, 5, user_id=1)
     statement, params = fake_db.execute.await_args.args
     assert "c.id AS chunk_id" in str(statement)
     assert "f.version AS file_version" in str(statement)
@@ -65,7 +65,7 @@ async def test_rag_sources_keep_reference_and_display_metadata(monkeypatch):
         "file_type": "md", "kb_name": "测试库"})
     monkeypatch.setattr("app.services.rag_service.hybrid_search", AsyncMock(return_value=[doc]))
     llm = SimpleNamespace(ainvoke=AsyncMock(return_value=AIMessage(content="回答[来源1]")))
-    result = await make_chat_node(llm)({"messages": [HumanMessage(content="问题")], "kb_id": "1"})
+    result = await make_chat_node(llm)({"messages": [HumanMessage(content="问题")], "kb_id": "1", "user_id": 1})
     source = result["sources"][0]
     assert source["chunk_id"] == "10" and source["file_version"] == 3
     assert source["file_id"] == "1" and source["file_type"] == "md" and source["kb_name"] == "测试库"

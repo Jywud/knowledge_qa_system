@@ -1,12 +1,21 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, PositiveInt
+
+
+class RoleSummary(BaseModel):
+    id: int
+    name: str
+    system_key: str | None = None
+
+    model_config = {"from_attributes": True}
 
 
 class UserOut(BaseModel):
     id: int
     username: str
-    role: str = "user"
+    roles: list[RoleSummary] = Field(default_factory=list)
+    is_admin: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -24,7 +33,27 @@ class LoginRequest(BaseModel):
 class CreateUserRequest(BaseModel):
     username: str
     password: str
-    role: str = "user"
+    role_ids: list[PositiveInt] = Field(min_length=1)
+
+    model_config = {"extra": "forbid"}
+
+
+class UserRolesUpdate(BaseModel):
+    role_ids: list[PositiveInt] = Field(min_length=1)
+
+
+class RoleWrite(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    description: str = Field(default="", max_length=2000)
+    kb_ids: list[PositiveInt] = Field(default_factory=list)
+
+    model_config = {"extra": "forbid"}
+
+
+class RoleOut(RoleSummary):
+    description: str
+    kb_ids: list[int]
+    user_count: int
 
 
 class PasswordResetRequest(BaseModel):

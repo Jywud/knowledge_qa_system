@@ -23,7 +23,7 @@ RETRIEVAL_CASES = [
 async def test_retrieval_case(case):
     from app.services.retrieval_service import hybrid_search
 
-    docs = await hybrid_search(case["query"], case["kb_id"], 5)
+    docs = await hybrid_search(case["query"], case["kb_id"], 5, user_id=int(os.getenv("RETRIEVAL_TEST_USER_ID", "1")))
     if case["expect_source"] is None:
         assert docs == []
     else:

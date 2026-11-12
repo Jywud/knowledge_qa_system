@@ -14,6 +14,7 @@ from app.audit import log_audit
 from app.database import get_db
 from app.models import Chunk, FileRecord, KnowledgeBase, User
 from app.schemas import ChunkOut, FileOut
+from app.services.permission_service import readable_kb_predicate, require_kb_read
 from app.services.document_service import (
     SUPPORTED_TYPES,
     delete_file_vectors,
@@ -120,6 +121,7 @@ async def list_files(
         .outerjoin(Chunk, Chunk.file_id == FileRecord.id)
         .join(User, User.id == FileRecord.uploaded_by)
         .group_by(FileRecord.id, User.username)
+        .where(readable_kb_predicate(FileRecord.kb_id, user.id))
         .order_by(FileRecord.id.desc())
     )
     if kb_id:
@@ -134,6 +136,10 @@ async def get_chunks(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    record = await db.get(FileRecord, file_id)
+    if not record:
+        raise HTTPException(404, "文件不存在或没有访问权限")
+    await require_kb_read(db, user.id, record.kb_id)
     result = await db.execute(
         select(Chunk).where(Chunk.file_id == file_id).order_by(Chunk.chunk_index)
     )

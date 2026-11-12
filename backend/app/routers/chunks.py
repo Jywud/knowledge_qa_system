@@ -6,6 +6,7 @@ from app.auth import get_current_user
 from app.database import get_db
 from app.models import Chunk, FileRecord, User
 from app.schemas import ChunkDetailOut
+from app.services.permission_service import readable_kb_predicate, require_kb_read
 
 router = APIRouter(prefix="/api/chunks", tags=["chunks"])
 
@@ -29,10 +30,13 @@ async def get_chunk(
             FileRecord.version.label("file_version"), FileRecord.filename, FileRecord.file_type,
         ).join(FileRecord, FileRecord.id == Chunk.file_id)
         .where(Chunk.id == chunk_id)
+        .where(readable_kb_predicate(FileRecord.kb_id, user.id))
     )
     row = result.first()
     if row is None:
         record = await db.get(FileRecord, file_id) if file_id is not None else None
+        if record is not None:
+            await require_kb_read(db, user.id, record.kb_id)
         if record is not None and version is not None and record.version != version:
             raise _unavailable(410, "原文件已更新，此引用已失效")
         raise _unavailable(404, "原文片段已不存在，文件可能已更新或删除")
