@@ -11,3 +11,4 @@ backend/uploads/*
 !backend/uploads/.gitkeep
 frontend/dist/
 .env
+output/
