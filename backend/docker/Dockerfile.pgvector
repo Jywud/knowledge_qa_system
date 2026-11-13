@@ -14,8 +14,10 @@ RUN apt-get update \
         build-essential wget bzip2 git postgresql-server-dev-16 \
     && rm -rf /var/lib/apt/lists/*
 
-# SCWS 1.2.3：zhparser 的底层分词库。若该地址不可达，改用可达的官方镜像源并把 URL 固定在此（记录到 PR）
+# SCWS 1.2.3：zhparser 的底层分词库，sha256 已固定（两次独立容器下载一致）。
+# 若该地址不可达，改用可达的官方镜像源并把 URL 与哈希固定在此（记录到 PR）
 RUN wget -q http://www.xunsearch.com/scws/down/scws-1.2.3.tar.bz2 \
+    && echo "60d50ac3dc42cff3c0b16cb1cfee47d8cb8c8baa142a58bc62854477b81f1af5  scws-1.2.3.tar.bz2" | sha256sum -c - \
     && tar -xjf scws-1.2.3.tar.bz2 \
     && cd scws-1.2.3 && ./configure --prefix=/usr/local && make && make install
 
