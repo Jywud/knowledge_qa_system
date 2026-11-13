@@ -1,0 +1,36 @@
+# 自建 PostgreSQL 16 镜像：pgvector 基础上编译 SCWS + zhparser，提供中文全文检索。
+# 构建上下文为仓库根目录：docker build -f backend/docker/Dockerfile.pgvector -t knowledge-qa/pg16-zhparser:latest .
+
+FROM pgvector/pgvector:pg16 AS builder
+
+# Acquire::Retries：CDN 偶发断连时 apt 层面自动重试。
+# 容器内 deb.debian.org 的 http:80 大文件传输持续失败（小文件正常），故先经 http 装
+# ca-certificates，再切到同一官方源 deb.debian.org 的 https 完成批量安装（未换镜像源）。
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends -o Acquire::Retries=5 ca-certificates \
+    && sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends -o Acquire::Retries=5 \
+        build-essential wget bzip2 git postgresql-server-dev-16 \
+    && rm -rf /var/lib/apt/lists/*
+
+# SCWS 1.2.3：zhparser 的底层分词库。若该地址不可达，改用可达的官方镜像源并把 URL 固定在此（记录到 PR）
+RUN wget -q http://www.xunsearch.com/scws/down/scws-1.2.3.tar.bz2 \
+    && tar -xjf scws-1.2.3.tar.bz2 \
+    && cd scws-1.2.3 && ./configure --prefix=/usr/local && make && make install
+
+# zhparser：commit 已固定（2026-11 构建探针记录）
+RUN git clone https://github.com/amutu/zhparser.git /tmp/zhparser \
+    && git -C /tmp/zhparser checkout 21ee29212e9f3b3c34bafb096e184f26c84111b5 \
+    && make -C /tmp/zhparser install
+
+FROM pgvector/pgvector:pg16
+
+COPY --from=builder /usr/lib/postgresql/16/lib/zhparser.so /usr/lib/postgresql/16/lib/
+COPY --from=builder /usr/share/postgresql/16/extension/zhparser.control /usr/share/postgresql/16/extension/
+COPY --from=builder /usr/share/postgresql/16/extension/zhparser--*.sql /usr/share/postgresql/16/extension/
+# SCWS 主词典与规则：zhparser 运行时从 tsearch_data 加载，缺失会导致中文切词失效
+COPY --from=builder /usr/share/postgresql/16/tsearch_data/dict.utf8.xdb /usr/share/postgresql/16/tsearch_data/
+COPY --from=builder /usr/share/postgresql/16/tsearch_data/rules.utf8.ini /usr/share/postgresql/16/tsearch_data/
+COPY --from=builder /usr/local/lib/libscws.so* /usr/local/lib/
+RUN ldconfig
