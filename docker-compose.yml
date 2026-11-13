@@ -1,6 +1,9 @@
 services:
   db:
-    image: pgvector/pgvector:pg16
+    build:
+      context: .
+      dockerfile: backend/docker/Dockerfile.pgvector
+    image: knowledge-qa/pg16-zhparser:latest
     restart: unless-stopped
     environment:
       POSTGRES_DB: knowledge_qa
