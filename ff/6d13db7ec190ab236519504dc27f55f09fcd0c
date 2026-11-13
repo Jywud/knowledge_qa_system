@@ -1,0 +1,24 @@
+docs/superpowers/specs/2026-11-13-pg-fts-keyword-search-design.md
+  fb2a5650aa5b728a 61-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "ff6d13db7ec190ab236519504dc27f55f09fcd0c",
+  "prompts": {
+    "fb2a5650aa5b728a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3944cff8-c7ce-4a4b-81fa-e494f90e13a9",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/17ab2a66dcd8ab5ed0283b519f05f8cf98be592116e465c14bcbd0e89c8e8948"
+    }
+  }
+}
