@@ -1,0 +1,28 @@
+backend/app/services/fts_service.py
+  fb2a5650aa5b728a 1-39
+backend/app/main.py
+  fb2a5650aa5b728a 44-49
+docker-compose.yml
+  fb2a5650aa5b728a 3-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "a52a578c7014e509650c66634dee215e72997034",
+  "prompts": {
+    "fb2a5650aa5b728a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3944cff8-c7ce-4a4b-81fa-e494f90e13a9",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 62,
+      "total_deletions": 5,
+      "accepted_lines": 182,
+      "overriden_lines": 1,
+      "messages_url": "https://git-ai.hsjdata.com/cas/61eb481c11b62dd7cfba080bafa614e475f7b873b9cf3d7acb64af0ebeea63d6"
+    }
+  }
+}
