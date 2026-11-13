@@ -62,7 +62,7 @@ zhparser 扩展或配置创建失败：记录明确错误日志并继续启动�
 
 主流开源 RAG 平台的关键词检索路线：RAGFlow 用外置 Elasticsearch 系倒排 + BM25（引擎抽象可换）；Dify 把全文检索委托给向量数据库原生能力（Weaviate BM25F、Qdrant BM25 稀疏向量），另有 jieba 分词 + 应用侧 BM25 关键词表的"经济模式"；LangChain/LlamaIndex 参考实现即本系统改造前的内存 BM25。它们不选 PG 扩展路线的原因是产品形态假设不同——多后端产品不能假设用户装得了扩展。
 
-本系统是刻意的单 Postgres 栈，zhparser 编译进自建镜像保持该性质，与社区多年的 PG 中文全文检索实践一致。演进出口：若未来迁移到无法安装扩展的托管 PG（云 RDS），`_fts_search` 是唯一替换点，可换为 Dify 式"应用侧 jieba 分词 + 简单配置 tsvector"方案，`hybrid_search` 与融合逻辑不动。
+本系统是刻意的单 Postgres 栈，zhparser 编译进自建镜像保持该性质，与社区多年的 PG 中文全文检索实践一致。扩展选型对比结论（2026-11 社区实测与云厂商文档调研）：pg_jieba（cppjieba 词典+HMM）在未登录新词识别上占优，zhparser（SCWS）在词性映射控制、词典热更新与生产资料上占优；企业术语场景的正确解法是自定义词典（两家均支持），HMM 的切词噪声反而伤精度，故选 zhparser。两者接入方式同构（text search configuration + to_tsvector + GIN），pg_jieba 为同架构备选解析器，切换成本 = 重建配置 + REINDEX。演进出口：若未来迁移到无法安装扩展的托管 PG（云 RDS），`_fts_search` 是唯一替换点，可换为 Dify 式"应用侧 jieba 分词 + 简单配置 tsvector"方案，`hybrid_search` 与融合逻辑不动。
 
 ## 测试
 
