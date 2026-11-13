@@ -1,0 +1,38 @@
+docs/superpowers/specs/2026-11-13-pg-fts-keyword-search-design.md
+  fb2a5650aa5b728a 1-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "454bb242e7b94f96a8d8682c536c7bdb50e8a2da",
+  "prompts": {
+    "e5ecd6d56210e8ff": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7c5b85cd-4b14-4179-95ab-3237edc5699b",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/096a86590a645d8d754b4f3e23344a64bff03083422bf0758214a0e10d591d49"
+    },
+    "fb2a5650aa5b728a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3944cff8-c7ce-4a4b-81fa-e494f90e13a9",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 73,
+      "total_deletions": 0,
+      "accepted_lines": 73,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/092259b14877a143742fed05ac3fc662966c050f5c5abce8c7ae624e830f68c8"
+    }
+  }
+}
