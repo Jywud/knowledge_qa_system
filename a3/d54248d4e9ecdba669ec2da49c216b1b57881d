@@ -1,0 +1,44 @@
+.gitignore
+  63f4420570790114 14
+docs/二阶段迭代计划.md
+  b3d72d52f77b1eb3 1-270
+docs/二阶段需求分析.md
+  b3d72d52f77b1eb3 1-372
+docs/二阶段PRD.md
+  b3d72d52f77b1eb3 1-476
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "a3d54248d4e9ecdba669ec2da49c216b1b57881d",
+  "prompts": {
+    "63f4420570790114": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3f6d8946-08b5-4095-a29b-3e22701d53e9",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/2642dc249a4cc9cf4850b9ef48cf5987930e5eef2e4cd8a1a13d0bf8716d34dc"
+    },
+    "b3d72d52f77b1eb3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1ca43-25f0-7ed2-b2d3-a0e3abcf5478",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 1118,
+      "total_deletions": 0,
+      "accepted_lines": 4453,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/8ea42e4ca15e72ced4cbbda69748bdeb403828c29d76cd5644fbc87fb075e559"
+    }
+  }
+}
