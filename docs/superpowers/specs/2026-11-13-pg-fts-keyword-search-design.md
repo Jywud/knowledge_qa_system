@@ -64,6 +64,8 @@ zhparser 扩展或配置创建失败：记录明确错误日志并继续启动�
 
 本系统是刻意的单 Postgres 栈，zhparser 编译进自建镜像保持该性质，与社区多年的 PG 中文全文检索实践一致。扩展选型对比结论（2026-11 社区实测与云厂商文档调研）：pg_jieba（cppjieba 词典+HMM）在未登录新词识别上占优，zhparser（SCWS）在词性映射控制、词典热更新与生产资料上占优；企业术语场景的正确解法是自定义词典（两家均支持），HMM 的切词噪声反而伤精度，故选 zhparser。两者接入方式同构（text search configuration + to_tsvector + GIN），pg_jieba 为同架构备选解析器，切换成本 = 重建配置 + REINDEX。演进出口：若未来迁移到无法安装扩展的托管 PG（云 RDS），`_fts_search` 是唯一替换点，可换为 Dify 式"应用侧 jieba 分词 + 简单配置 tsvector"方案，`hybrid_search` 与融合逻辑不动。
 
+质量演进路径（2026-11-13 复核，经用户确认维持 zhparser）：追求 BM25 排序上限时评估 ParadeDB pg_search（真 BM25 + 内置 jieba/chinese_compatible 分词器，官方镜像自带 pgvector 免编译；AGPL 许可与索引访问方法更迭是采用门槛）或 Tiger Data pg_textsearch（PostgreSQL 许可，2026-04 GA；中文分词与 PG16 可用性未证实）。两者与本设计同构，`_fts_search` 为唯一替换点。Milvus 等外置向量库仅在检索层需水平扩展的百万级 chunk 形态下再评估（双写一致性、权限过滤重写与多组件运维成本高于收益）。
+
 ## 测试
 
 - 默认套件（SQLite 内存库）保持"不需要 PostgreSQL"的承诺：FTS 关键词通道与向量通道同样以打桩方式处理；实施时检查现有涉及 `hybrid_search` 的测试（如检索权限、多库对话）的桩点并适配。
