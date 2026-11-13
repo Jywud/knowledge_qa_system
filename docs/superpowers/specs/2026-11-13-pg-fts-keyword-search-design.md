@@ -58,6 +58,12 @@ zhparser 扩展或配置创建失败：记录明确错误日志并继续启动�
 - 企业术语、产品名分不出来时维护 zhparser 自定义词典；词典变更同样需要 REINDEX。
 - 换用带 zhparser 的自建镜像是正式部署的硬前提，README 部署章节需写明。
 
+## 生态对照（选型依据）
+
+主流开源 RAG 平台的关键词检索路线：RAGFlow 用外置 Elasticsearch 系倒排 + BM25（引擎抽象可换）；Dify 把全文检索委托给向量数据库原生能力（Weaviate BM25F、Qdrant BM25 稀疏向量），另有 jieba 分词 + 应用侧 BM25 关键词表的"经济模式"；LangChain/LlamaIndex 参考实现即本系统改造前的内存 BM25。它们不选 PG 扩展路线的原因是产品形态假设不同——多后端产品不能假设用户装得了扩展。
+
+本系统是刻意的单 Postgres 栈，zhparser 编译进自建镜像保持该性质，与社区多年的 PG 中文全文检索实践一致。演进出口：若未来迁移到无法安装扩展的托管 PG（云 RDS），`_fts_search` 是唯一替换点，可换为 Dify 式"应用侧 jieba 分词 + 简单配置 tsvector"方案，`hybrid_search` 与融合逻辑不动。
+
 ## 测试
 
 - 默认套件（SQLite 内存库）保持"不需要 PostgreSQL"的承诺：FTS 关键词通道与向量通道同样以打桩方式处理；实施时检查现有涉及 `hybrid_search` 的测试（如检索权限、多库对话）的桩点并适配。
