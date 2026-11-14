@@ -7,6 +7,7 @@ from docx import Document as DocxDocument
 from docx.oxml.ns import qn
 from docx.table import Table as DocxTable
 from docx.text.paragraph import Paragraph as DocxParagraph
+from pptx import Presentation
 
 from langchain_core.documents import Document
 from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
@@ -20,7 +21,7 @@ from app.config import BASE_DIR, settings
 from app.models import Chunk, FileRecord
 from app.services.settings_service import get_system_settings
 
-SUPPORTED_TYPES = {"md", "docx", "pdf", "txt"}
+SUPPORTED_TYPES = {"md", "docx", "pdf", "txt", "pptx"}
 # 短于此字符数（含面包屑）的分块会在切分后并入相邻分块，避免 embedding 信号过弱
 _MIN_CHUNK_CHARS = 100
 logger = logging.getLogger(__name__)
@@ -103,6 +104,36 @@ def _load_docx(path: Path) -> list:
             markdown = _table_to_markdown(item)
             if markdown:
                 blocks.append(("table", markdown, None))
+    return blocks
+
+
+def _load_pptx(path: Path) -> list:
+    blocks: list = []
+    presentation = Presentation(str(path))
+    for number, slide in enumerate(presentation.slides, start=1):
+        title = ""
+        title_shape = slide.shapes.title
+        if title_shape is not None and title_shape.has_text_frame:
+            title = title_shape.text_frame.text.strip()
+        heading_text = f"第{number}页 · {title or '未命名'}"
+        slide_blocks: list = []
+        for shape in slide.shapes:
+            if title_shape is not None and shape.shape_id == title_shape.shape_id:
+                continue  # 标题已进面包屑，避免正文重复
+            if getattr(shape, "has_table", False) and shape.has_table:
+                markdown = _table_to_markdown(shape.table)
+                if markdown.strip():
+                    slide_blocks.append(("table", markdown, None))
+            elif getattr(shape, "has_text_frame", False) and shape.text_frame.text.strip():
+                slide_blocks.append(("paragraph", shape.text_frame.text.strip(), None))
+        if slide.has_notes_slide:
+            notes = slide.notes_slide.notes_text_frame.text.strip()
+            if notes:
+                slide_blocks.append(("paragraph", f"【备注】{notes}", None))
+        if not slide_blocks:
+            continue  # 空页（无内容无备注）不产生任何块
+        blocks.append(("heading", heading_text, 1))
+        blocks.extend(slide_blocks)
     return blocks
 
 
@@ -310,6 +341,8 @@ async def ingest_file(
     system_settings = await get_system_settings(db)
     if file_type == "docx":
         chunks = _split_docx(_load_docx(path), system_settings.chunk_size, system_settings.chunk_overlap)
+    elif file_type == "pptx":
+        chunks = _split_docx(_load_pptx(path), system_settings.chunk_size, system_settings.chunk_overlap)
     else:
         docs = _load_documents(path, file_type)
         chunks = _split_documents(docs, system_settings.chunk_size, system_settings.chunk_overlap)
