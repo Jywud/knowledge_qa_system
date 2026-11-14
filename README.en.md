@@ -68,7 +68,7 @@ Configure chunk size, overlap and retrieval TopK, with guidance on which setting
 - **Multi-knowledge-base support**: admins can create, edit, and delete knowledge bases. Users can only view authorized knowledge bases, their statistics, files, and chunks.
 - **File management**: supports `md`, `txt`, `docx`, and `pdf`. Admins can upload up to 10 files at a time to a selected knowledge base. Parsing, chunking, and embedding run in the background with statuses `processing`, `ready`, or `failed`.
 - **AI Q&A**: users search all accessible knowledge bases by default and may optionally narrow a new conversation to one knowledge base. Responses stream token by token, preserve multi-turn context, auto-generate a concise conversation title after the first answer, and honestly state when the knowledge base has no relevant content instead of making up answers.
-- **Hybrid retrieval**: pgvector semantic search combined with LangChain Community `BM25Retriever` keyword search, fused with Reciprocal Rank Fusion (RRF).
+- **Hybrid retrieval**: pgvector semantic search combined with PostgreSQL full-text search (zhparser Chinese word segmentation, GIN index), fused with Reciprocal Rank Fusion (RRF); when either the vector or keyword channel fails, results automatically fall back to the single healthy channel.
 - **Safe updates and citations**: uploads default to a 50MB per-file limit. Successful updates replace chunks and increment the version; failures preserve original data. Inline citation badges load individual chunks with file/version checks; legacy references show saved excerpts.
 - **Performance and context**: an HNSW cosine similarity index is created for `chunks.embedding` at startup. The recent conversation history sent to the LLM is limited to 20 messages by default. When total messages exceed 30, older messages are automatically compressed into a summary and combined with the recent 20 for the LLM.
 - **System settings**: admins can configure chunk size, chunk overlap, and TopK.
@@ -104,7 +104,7 @@ backend/
     routers/              # auth / users / roles / knowledge-bases / files / chunks / chat / settings
     services/
       document_service.py # Document parsing, chunking, embedding, status updates
-      retrieval_service.py# pgvector + BM25 hybrid retrieval with BM25 fallback
+      retrieval_service.py# pgvector + keyword hybrid retrieval with single-channel fallback
       rag_service.py      # LangGraph RAG orchestration
       settings_service.py # Runtime system settings
   requirements.txt
@@ -219,6 +219,8 @@ Open http://localhost:8080. Change the exposed port with the `FRONTEND_PORT` env
 
 Compose assigns the frontend proxy `172.30.250.3` and configures the backend to trust only that address. If this subnet conflicts with an existing network, set both `QA_PROXY_SUBNET` (default `172.30.250.0/24`) and `QA_PROXY_IP` in the root `.env`, then recreate the service network without deleting data volumes. Do not set trusted proxies to `*`. Additional reverse proxies require an explicit trust boundary and header replacement; see [the login protection design](docs/登录防暴力破解设计.md).
 
+The database uses a self-built image (`backend/docker/Dockerfile.pgvector`, compiling SCWS + zhparser on top of `pgvector/pgvector:pg16`). After changing zhparser segmentation parameters or custom dictionaries, run `REINDEX INDEX idx_chunks_content_fts` in the database.
+
 ## Tests
 
 Windows PowerShell commands; install optional test tools in the backend virtual environment:
@@ -235,7 +237,7 @@ node --test tests/*.spec.js
 npm run build
 ```
 
-Backend tests use isolated temporary SQLite and mocked models by default. Two retrieval cases need local PostgreSQL, an embedding service, and the knowledge base/documents configured in `tests/test_retrieval_regression.py`; adapt its IDs and expected sources to your data. From `backend/`, set `$env:RUN_RETRIEVAL_TESTS='1'` and run `.\.venv\Scripts\python.exe -m pytest tests/test_retrieval_regression.py -q`. Role-access tests cover role assignment, knowledge-base isolation, revocation, and frontend identity refresh. Use the current local run for pass counts. Docker deployment and concurrency load testing are not included.
+Backend tests use isolated temporary SQLite and mocked models by default. Two retrieval cases need local PostgreSQL, an embedding service, and the knowledge base/documents configured in `tests/test_retrieval_regression.py`; adapt its IDs and expected sources to your data. From `backend/`, set `$env:RUN_RETRIEVAL_TESTS='1'` and run `.\.venv\Scripts\python.exe -m pytest tests/test_retrieval_regression.py -q`. Full-text search verification requires setting `FTS_POSTGRES_TESTS=1` (PostgreSQL with zhparser is needed). Role-access tests cover role assignment, knowledge-base isolation, revocation, and frontend identity refresh. Use the current local run for pass counts. Docker deployment and concurrency load testing are not included.
 
 ## Upgrade Notes
 

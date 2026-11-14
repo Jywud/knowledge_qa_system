@@ -48,7 +48,7 @@ LangGraph 图：`START → summarize → chat`，经 `build_graph(checkpointer)`
 
 ### 混合检索（app/services/retrieval_service.py）
 
-`hybrid_search` = pgvector 余弦检索（阈值 `retrieval_min_score`，建了 HNSW 索引）+ BM25 关键词检索，RRF（k=60）融合。注意：BM25 是**每次请求把 KB 全部 chunk 读入内存重建**，`_chunk_key` 用 `(file_id, chunk_index)` 去重合并——改检索逻辑时保持这个键稳定。
+`hybrid_search` = pgvector 余弦检索（阈值 `retrieval_min_score`，HNSW 索引）+ PostgreSQL 全文检索（zhparser 词级分词，表达式 GIN 索引 `idx_chunks_content_fts`，AND 零命中 OR 兜底），RRF（k=60）融合。关键词检索走 `_fts_search`，权限谓词与 `_vector_search` 同构——改检索逻辑时保持返回列集与 `_row_document` 兼容。
 
 ### 文档摄取（app/services/document_service.py）
 
@@ -64,6 +64,6 @@ LangGraph 图：`START → summarize → chat`，经 `build_graph(checkpointer)`
 
 ## 已知取舍（改动前先了解）
 
-- BM25 每请求全量加载（见上），数据量大时会成为瓶颈；候选改进是 PostgreSQL 全文检索（zhparser/pg_jieba）。
-- `hybrid_search` 中向量结果为空会直接返回空，跳过 BM25——有意的保守行为，改动需考虑 embedding 服务故障时的行为。
+- 关键词检索依赖 zhparser 扩展（自建镜像）；扩展不可用时自动降级为纯向量检索并记日志。调整分词 GUC 或词典后需 REINDEX idx_chunks_content_fts。
+- `hybrid_search` 中向量结果为空会直接返回空，跳过关键词检索——有意的保守行为，改动需考虑 embedding 服务故障时的行为。
 - 测试覆盖：登录/用户/文件/检索回归（`tests/test_retrieval_regression.py`）；RAG 或检索改动需按 `AGENTS.md` 要求在 PR 中记录人工测试问题与期望来源。

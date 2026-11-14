@@ -68,7 +68,7 @@
 - **多知识库**：管理员创建 / 编辑 / 删除知识库，用户仅能查看已授权知识库的列表、统计、文件及分块。
 - **文件管理**：支持 `md` / `txt` / `docx` / `pdf`；管理员可在指定知识库内一次最多上传 10 个文件，解析、切分和向量化在后台执行，状态为“处理中 / 就绪 / 失败”。
 - **智能问答**：默认检索全部可访问知识库，也可限定单库；支持流式输出、多轮上下文记忆、会话列表和历史记录恢复；首轮回答后自动生成简洁会话标题；知识库未命中内容时如实说明，不编造答案。
-- **混合检索**：pgvector 向量检索 + LangChain Community `BM25Retriever` 关键词检索，通过 RRF 融合排序。
+- **混合检索**：pgvector 向量检索 + PostgreSQL 全文检索（zhparser 中文分词，GIN 索引），通过 RRF 融合排序；向量或关键词通道异常时自动降级为单通道结果。
 - **文件更新保护**：单文件默认上限 50MB；更新成功后才切换分块并递增版本，失败保留原文件和分块。
 - **来源引用**：正文使用数字角标；来源弹窗按需加载单个分块并核对文件版本。旧格式仅展示保存的摘要，文件更新或删除后明确提示失效。
 - **性能与上下文**：启动时为 `chunks.embedding` 创建 HNSW 余弦相似度索引；发送给大模型的最近历史消息默认限制为 20 条；超过 30 条后自动将旧消息压缩为摘要，与最近 20 条一起传给大模型。
@@ -105,7 +105,7 @@ backend/
     routers/              # auth / users / roles / knowledge-bases / files / chunks / chat / settings
     services/
       document_service.py # 文档解析、分块、向量化、状态回写
-      retrieval_service.py# 向量 + BM25 混合检索，向量异常时降级 BM25
+      retrieval_service.py# 向量 + 关键词混合检索，单通道异常时自动降级
       rag_service.py      # LangGraph RAG 编排
       settings_service.py # 运行时系统设置
   requirements.txt
@@ -220,6 +220,8 @@ docker compose up -d --build
 
 登录限流依赖可信代理边界：Compose 将前端代理固定在 `172.30.250.3`，后端只信任该地址。若代理网段与本机网络冲突，在根目录 `.env` 同时调整 `QA_PROXY_SUBNET`（默认 `172.30.250.0/24`）和其内的 `QA_PROXY_IP`，然后重建服务网络，无需删除数据卷。额外反向代理及多实例部署参见 [登录防暴力破解设计](docs/登录防暴力破解设计.md)，不要将可信代理配置为 `*`。
 
+数据库使用自建镜像（backend/docker/Dockerfile.pgvector，基于 pgvector/pgvector:pg16 编译 SCWS + zhparser）。调整 zhparser 分词参数或自定义词典后需在库内执行 REINDEX INDEX idx_chunks_content_fts。
+
 ## 运行测试
 
 以下命令在 Windows PowerShell 中运行，测试依赖按需安装到后端虚拟环境：
@@ -236,7 +238,7 @@ node --test tests/*.spec.js
 npm run build
 ```
 
-后端默认使用 隔离临时 SQLite和模拟模型，不需要真实模型服务；两项真实检索回归默认跳过。集成验证需准备 PostgreSQL、Embedding 服务及 `tests/test_retrieval_regression.py` 中配置的知识库/样例文件，按实际环境调整 ID 和预期来源；在 `backend/` 设置 `$env:RUN_RETRIEVAL_TESTS='1'` 后运行 `.\.venv\Scripts\python.exe -m pytest tests/test_retrieval_regression.py -q`。角色权限测试覆盖角色分配、知识库隔离、撤权与前端身份刷新；具体通过数量以本地运行结果为准，不包含 Docker 端到端部署或并发压测。
+后端默认使用 隔离临时 SQLite和模拟模型，不需要真实模型服务；两项真实检索回归默认跳过。集成验证需准备 PostgreSQL、Embedding 服务及 `tests/test_retrieval_regression.py` 中配置的知识库/样例文件，按实际环境调整 ID 和预期来源；在 `backend/` 设置 `$env:RUN_RETRIEVAL_TESTS='1'` 后运行 `.\.venv\Scripts\python.exe -m pytest tests/test_retrieval_regression.py -q`。全文检索验证需设置 `FTS_POSTGRES_TESTS=1`（需要带 zhparser 的 PostgreSQL）。角色权限测试覆盖角色分配、知识库隔离、撤权与前端身份刷新；具体通过数量以本地运行结果为准，不包含 Docker 端到端部署或并发压测。
 
 ## 升级说明
 
