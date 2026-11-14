@@ -52,7 +52,7 @@ LangGraph 图：`START → summarize → chat`，经 `build_graph(checkpointer)`
 
 ### 文档摄取（app/services/document_service.py）
 
-解析（docx 用原生 zipfile+ElementTree，pdf 用 PyMuPDF）→ 表格感知分块（Markdown 表格按"表头: 单元格"拆行再聚合）→ 向量化 → 与 chunk 同事务写 `chunks` 表。**Embedding 维度不可随意改**：`embedding` 列是 `Vector(settings.embed_dim)`，换模型/维度需清空 chunks 重建，且已生成向量与新查询向量不可混用。
+解析（docx 用原生 zipfile+ElementTree，pdf 用 PyMuPDF，pptx 用 python-pptx 按页产出与 docx 相同的块流——页标题作面包屑、空页跳过、备注带【备注】前缀——复用 `_split_docx`）→ 表格感知分块（Markdown 表格按"表头: 单元格"拆行再聚合）→ 向量化 → 与 chunk 同事务写 `chunks` 表。**Embedding 维度不可随意改**：`embedding` 列是 `Vector(settings.embed_dim)`，换模型/维度需清空 chunks 重建，且已生成向量与新查询向量不可混用。
 
 ### 配置优先级
 
