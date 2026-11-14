@@ -32,7 +32,42 @@ def test_docx_split_adds_breadcrumb(tmp_path):
     chunks = _split_docx(_load_docx(_build_docx(tmp_path)), 800, 100)
     contents = [chunk.page_content for chunk in chunks]
 
-    assert any(content.startswith("使用指南 > MCP 配置\n") for content in contents)
+    # 短分块合并后面包屑可能不再是分块首行，但必须保留
+    assert any("使用指南 > MCP 配置\n" in content for content in contents)
+
+
+def test_docx_split_merges_tail_short_chunk_into_previous(tmp_path):
+    doc = DocxDocument()
+    doc.add_heading("系统指南", level=1)
+    doc.add_paragraph("长" * 195 + "\n尾句标记XYZabc")
+    path = tmp_path / "tail.docx"
+    doc.save(str(path))
+
+    chunks = _split_docx(_load_docx(path), 200, 20)
+
+    assert len(chunks) == 1
+    content = chunks[0].page_content
+    assert content.startswith("系统指南\n")
+    assert content.count("系统指南") == 1
+    assert "尾句标记XYZabc" in content
+
+
+def test_docx_split_merges_section_opening_short_chunk_into_next(tmp_path):
+    doc = DocxDocument()
+    doc.add_heading("总览", level=1)
+    doc.add_heading("小节甲", level=2)
+    doc.add_paragraph("只有一句话。")
+    doc.add_heading("小节乙", level=2)
+    doc.add_paragraph("乙节内容详细描述。" * 14)
+    path = tmp_path / "opening.docx"
+    doc.save(str(path))
+
+    chunks = _split_docx(_load_docx(path), 200, 20)
+
+    assert len(chunks) == 1
+    content = chunks[0].page_content
+    assert "总览 > 小节甲\n只有一句话。" in content
+    assert "总览 > 小节乙\n" in content
 
 
 def test_docx_split_expands_table_rows(tmp_path):

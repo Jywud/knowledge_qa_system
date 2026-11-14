@@ -21,6 +21,8 @@ from app.models import Chunk, FileRecord
 from app.services.settings_service import get_system_settings
 
 SUPPORTED_TYPES = {"md", "docx", "pdf", "txt"}
+# 短于此字符数（含面包屑）的分块会在切分后并入相邻分块，避免 embedding 信号过弱
+_MIN_CHUNK_CHARS = 100
 logger = logging.getLogger(__name__)
 
 
@@ -121,6 +123,47 @@ def _group_table_rows(block: str, chunk_size: int) -> list[str]:
     return grouped
 
 
+def _merge_small_chunks(chunks: list[Document], chunk_size: int) -> list[Document]:
+    """过短分块就近合并：同节并入前一个分块（面包屑去重），跨节的小节起始块并入后一个分块。
+
+    合并后总长不得超过 chunk_size 的 1.2 倍，两边都放不下则保留原样；
+    从前往后线性扫描，合并产生的较大块不再作为短块参与后续判断。
+    """
+    limit = int(chunk_size * 1.2)
+    merged: list[Document] = []
+    index = 0
+    while index < len(chunks):
+        chunk = chunks[index]
+        if len(chunk.page_content) >= _MIN_CHUNK_CHARS:
+            merged.append(chunk)
+            index += 1
+            continue
+        label = chunk.metadata.get("path_label") or ""
+        prefix = f"{label}\n" if label else ""
+        body = chunk.page_content[len(prefix):] if prefix and chunk.page_content.startswith(prefix) else chunk.page_content
+        same_section = bool(merged) and merged[-1].metadata.get("path_label") == chunk.metadata.get("path_label")
+        if same_section:
+            prev = merged[-1]
+            if len(prev.page_content) + 1 + len(body) <= limit:
+                merged[-1] = Document(
+                    page_content=f"{prev.page_content}\n{body}", metadata=dict(prev.metadata)
+                )
+                index += 1
+                continue
+        elif index + 1 < len(chunks):
+            following = chunks[index + 1]
+            candidate = f"{chunk.page_content}\n{following.page_content}"
+            if len(candidate) <= limit:
+                merged.append(
+                    Document(page_content=candidate, metadata=dict(following.metadata))
+                )
+                index += 2
+                continue
+        merged.append(chunk)
+        index += 1
+    return merged
+
+
 def _split_docx(blocks: list, chunk_size: int, chunk_overlap: int) -> list[Document]:
     splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     sections: list[tuple[str, list]] = []
@@ -164,8 +207,11 @@ def _split_docx(blocks: list, chunk_size: int, chunk_overlap: int) -> list[Docum
         flush_paragraphs()
 
         prefix = f"{path_label}\n" if path_label else ""
-        documents.extend(Document(page_content=prefix + chunk) for chunk in chunks)
-    return documents
+        documents.extend(
+            Document(page_content=prefix + chunk, metadata={"path_label": path_label})
+            for chunk in chunks
+        )
+    return _merge_small_chunks(documents, chunk_size)
 
 
 def _load_documents(path: Path, file_type: str):
@@ -208,7 +254,7 @@ def _split_documents(docs: list[Document], chunk_size: int, chunk_overlap: int) 
                 chunks.extend(Document(page_content=item, metadata=doc.metadata) for item in grouped)
             else:
                 chunks.extend(splitter.split_documents([Document(page_content=block.strip(), metadata=doc.metadata)]))
-    return chunks
+    return _merge_small_chunks(chunks, chunk_size)
 
 
 async def ingest_file(
