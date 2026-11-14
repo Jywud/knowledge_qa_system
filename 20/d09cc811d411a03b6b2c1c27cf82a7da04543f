@@ -1,0 +1,30 @@
+README.en.md
+  f6fb067149036380 69
+docs/变更记录.md
+  f6fb067149036380 3-8
+CLAUDE.md
+  f6fb067149036380 55
+README.md
+  f6fb067149036380 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "20d09cc811d411a03b6b2c1c27cf82a7da04543f",
+  "prompts": {
+    "f6fb067149036380": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "92f548be-6e35-4b67-b8e5-65d921ee924a",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 391,
+      "overriden_lines": 36,
+      "messages_url": "https://git-ai.hsjdata.com/cas/422ab4153eae89d058a3831cadb4b7bcdd65dcb6886fda1e7b43a098114af5a3"
+    }
+  }
+}
