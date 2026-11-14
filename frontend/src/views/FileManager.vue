@@ -152,7 +152,7 @@ const STATUS_META = {
           multiple
           :limit="10"
           :on-exceed="() => ElMessage.warning('单次最多上传 10 个文件')"
-          accept=".md,.docx,.pdf,.txt"
+          accept=".md,.docx,.pdf,.txt,.pptx"
         >
           <el-button type="primary" :icon="Upload">上传文件（最多 10 个）</el-button>
         </el-upload>
@@ -212,7 +212,7 @@ const STATUS_META = {
               v-if="isAdmin"
               :show-file-list="false"
               :http-request="(opt) => updateFile(opt, row)"
-              accept=".md,.docx,.pdf,.txt"
+              accept=".md,.docx,.pdf,.txt,.pptx"
               style="display: inline-block; margin: 0 8px; white-space: nowrap; vertical-align: middle"
             >
               <el-button
@@ -248,7 +248,7 @@ const STATUS_META = {
                 multiple
                 :limit="10"
                 :on-exceed="() => ElMessage.warning('单次最多上传 10 个文件')"
-                accept=".md,.docx,.pdf,.txt"
+                accept=".md,.docx,.pdf,.txt,.pptx"
               >
                 <el-button type="primary" :icon="Upload">上传第一个文件</el-button>
               </el-upload>
