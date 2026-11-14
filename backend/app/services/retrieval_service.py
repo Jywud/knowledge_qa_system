@@ -5,6 +5,7 @@ from sqlalchemy import text
 from fastapi import HTTPException
 
 from app.services.document_service import get_embeddings
+from app.services.rerank_service import rerank_documents
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,7 @@ def _require_context(kb_id: int | None, user_id: int | None, kb_ids: list[int] |
 
 
 async def _vector_search(query_vector: list[float], kb_id: int | None, limit: int, *, user_id: int | None = None,
-                         kb_ids: list[int] | None = None) -> list[Document]:
+                         kb_ids: list[int] | None = None, min_score: float | None = None) -> list[Document]:
     from app.database import SessionLocal
 
     _require_context(kb_id, user_id, kb_ids)
@@ -86,7 +87,7 @@ async def _vector_search(query_vector: list[float], kb_id: int | None, limit: in
     if kb_ids is not None:
         statement += " AND f.kb_id = ANY(CAST(:kb_ids AS INTEGER[]))"
         params["kb_ids"] = kb_ids
-    max_distance = 1 - settings.retrieval_min_score
+    max_distance = 1 - (settings.retrieval_min_score if min_score is None else min_score)
     statement += " AND c.embedding <=> CAST(:qv AS vector) <= :max_distance"
     params["max_distance"] = max_distance
     statement += " ORDER BY c.embedding <=> CAST(:qv AS vector) LIMIT :k"
@@ -153,25 +154,43 @@ async def _fts_search(query: str, kb_id: int | None, limit: int, *, user_id: int
     return [_row_document(row) for row in rows]
 
 
-async def hybrid_search(query: str, kb_id: int | None, top_k: int, *, user_id: int | None = None,
-                        kb_ids: list[int] | None = None) -> list[Document]:
+async def hybrid_search(query: str, kb_id: int | None, top_k: int, *, rrf_top_n: int | None = None,
+                        rerank_enabled: bool = False, top_n: int | None = None, min_score: float | None = None,
+                        user_id: int | None = None, kb_ids: list[int] | None = None) -> list[Document]:
+    """混合检索：top_k 为每路召回候选数，rrf_top_n 为 RRF 融合后保留条数，min_score 为向量召回相关度下限；
+    开启 rerank 时对融合候选精排并取 top_n 条，失败按融合顺序降级。"""
     _require_context(kb_id, user_id, kb_ids)
     if kb_id is not None and kb_ids is not None and kb_id not in kb_ids:
         return []
-    candidate_k = max(top_k * 2, 10)
+    keep = rrf_top_n or top_k
     try:
         query_vector = await get_embeddings().aembed_query(query)
-        vector_docs = await _vector_search(query_vector, kb_id, candidate_k, user_id=user_id, kb_ids=kb_ids)
+        vector_docs = await _vector_search(query_vector, kb_id, top_k, user_id=user_id, kb_ids=kb_ids,
+                                           min_score=min_score)
     except Exception:
         logger.exception("向量检索失败，降级为纯关键词结果")
         vector_docs = None
     if vector_docs is not None and not vector_docs:
         return []  # 保守行为保持：向量零命中直接返回空，不引入关键词噪声
     try:
-        keyword_docs = await _fts_search(query, kb_id, candidate_k, user_id=user_id, kb_ids=kb_ids)
+        keyword_docs = await _fts_search(query, kb_id, top_k, user_id=user_id, kb_ids=kb_ids)
     except Exception:
         logger.exception("关键词检索失败，降级为纯向量结果")
         keyword_docs = []
-    if vector_docs is None:
-        return keyword_docs[:top_k]
-    return _merge_candidates(vector_docs, keyword_docs, top_k)
+    fused = _merge_candidates(vector_docs, keyword_docs, keep) if vector_docs is not None \
+        else keyword_docs[:keep]
+    if not rerank_enabled:
+        return fused
+    return await _rerank_candidates(query, fused, top_n or keep)
+
+
+async def _rerank_candidates(query: str, docs: list[Document], top_n: int) -> list[Document]:
+    if not docs:
+        return docs
+    try:
+        results = await rerank_documents(query, [doc.page_content for doc in docs], top_n)
+    except Exception:
+        logger.exception("重排服务调用失败，按融合顺序返回前 %s 条", top_n)
+        return docs[:top_n]
+    ordered = [docs[index] for index, _score in results if 0 <= index < len(docs)]
+    return ordered[:top_n]

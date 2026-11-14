@@ -24,6 +24,13 @@ export async function refreshUser() {
   return user.value;
 }
 
+// 本次页面会话已确认过身份时直接复用，避免守卫与布局各调一次 /auth/me；
+// 角色变更后需要强制刷新时仍用 refreshUser()。
+export async function ensureUser() {
+  if (!user.value) await refreshUser();
+  return user.value;
+}
+
 export const conversations = ref([]);
 
 export const currentConversationId = ref(null);

@@ -7,7 +7,7 @@ import AppSidebar from "./AppSidebar.vue";
 import { newPasswordRules } from "../utils/validation";
 import {
   api,
-  refreshUser,
+  ensureUser,
   user,
   conversations,
   currentConversationId,
@@ -40,7 +40,7 @@ const passwordRules = {
 
 onMounted(async () => {
   try {
-    await refreshUser();
+    await ensureUser();
     ready.value = true;
     if (["/roles", "/users", "/settings"].includes(router.currentRoute.value.path) && !user.value?.is_admin) {
       router.replace("/chat");

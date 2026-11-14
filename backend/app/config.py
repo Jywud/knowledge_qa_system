@@ -12,7 +12,9 @@ class Settings(BaseSettings):
     upload_dir: str = "uploads"
     chunk_size: int = 800
     chunk_overlap: int = 100
-    top_k: int = 5
+    top_k: int = 30
+    rrf_top_n: int = 20
+    top_n: int = 5
     embed_dim: int = 1024
     retrieval_min_score: float = 0.5
     max_history_messages: int = 20
@@ -26,6 +28,11 @@ class Settings(BaseSettings):
     embed_openai_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     embed_openai_api_key: str = ""
     embed_openai_dimensions: int | None = None
+
+    rerank_provider: str = "none"
+    rerank_model: str = "gte-rerank-v2"
+    rerank_api_key: str = ""
+    rerank_base_url: str = "https://dashscope.aliyuncs.com"
 
     llm_base_url: str = "https://ark.cn-beijing.volces.com/api/coding/v3"
     llm_api_key: str = ""

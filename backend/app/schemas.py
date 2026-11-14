@@ -149,6 +149,10 @@ class SystemSettingOut(BaseModel):
     chunk_size: int
     chunk_overlap: int
     top_k: int
+    rerank_enabled: bool
+    rrf_top_n: int
+    top_n: int
+    retrieval_min_score: float
 
     model_config = {"from_attributes": True}
 
@@ -157,3 +161,7 @@ class SystemSettingUpdate(BaseModel):
     chunk_size: int
     chunk_overlap: int
     top_k: int
+    rerank_enabled: bool
+    rrf_top_n: int
+    top_n: int
+    retrieval_min_score: float

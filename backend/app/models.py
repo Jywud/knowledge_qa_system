@@ -1,7 +1,7 @@
 import datetime as dt
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func, text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -118,7 +118,11 @@ class SystemSetting(Base):
     id: Mapped[int] = mapped_column(primary_key=True, default=1)
     chunk_size: Mapped[int] = mapped_column(Integer, default=800)
     chunk_overlap: Mapped[int] = mapped_column(Integer, default=100)
-    top_k: Mapped[int] = mapped_column(Integer, default=5)
+    top_k: Mapped[int] = mapped_column(Integer, default=30)
+    rerank_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    rrf_top_n: Mapped[int] = mapped_column(Integer, default=20, server_default=text("20"))
+    top_n: Mapped[int] = mapped_column(Integer, default=5, server_default=text("5"))
+    retrieval_min_score: Mapped[float] = mapped_column(Float, default=0.5, server_default=text("0.5"))
 
 
 class AuditLog(Base):

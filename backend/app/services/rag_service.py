@@ -45,6 +45,10 @@ class ChatState(TypedDict):
     sources: list
     kb_id: str | None
     top_k: int | None
+    rrf_top_n: int | None
+    rerank_enabled: bool | None
+    top_n: int | None
+    retrieval_min_score: float | None
     summary: str
     summarized_count: int
     user_id: int
@@ -134,7 +138,11 @@ def make_chat_node(llm: ChatOpenAI):
         query = extract_text(state["messages"][-1].content)
         kb_id = state.get("kb_id")
         top_k = state.get("top_k") or settings.top_k
+        rrf_top_n = state.get("rrf_top_n") or settings.rrf_top_n
+        top_n = state.get("top_n") or settings.top_n
         docs = await hybrid_search(query, int(kb_id) if kb_id else None, top_k,
+                                   rrf_top_n=rrf_top_n, rerank_enabled=bool(state.get("rerank_enabled")),
+                                   top_n=top_n, min_score=state.get("retrieval_min_score"),
                                    user_id=state.get("user_id"), kb_ids=state.get("kb_ids"))
         sources = [
             {

@@ -12,3 +12,5 @@ backend/uploads/*
 frontend/dist/
 .env
 output/
+.playwright-mcp/
+.claude/settings.json

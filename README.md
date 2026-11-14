@@ -2,11 +2,11 @@
 
 [English](./README.en.md) | [简体中文](./README.md)
 
-前后端分离的企业知识库问答系统：支持账号密码登录、角色与知识库授权、多知识库管理、文件解析分块、混合检索、流式多轮问答与来源引用。
+前后端分离的企业知识库问答系统：支持账号密码登录、角色与知识库授权、多知识库管理、文件解析分块、混合检索与语义重排、流式多轮问答与来源引用。
 
 ## 界面预览
 
-以下截图来自当前版本的本地隔离演示环境，使用示例账号与资料，展示角色授权、跨库问答及管理流程。点击图片可查看原图。
+以下截图来自本地隔离演示环境，使用示例账号与资料，展示角色授权、跨库问答及管理流程。点击图片可查看原图。
 
 | 登录 | 首页工作台 |
 |---|---|
@@ -54,7 +54,7 @@
 
 ### 系统设置
 
-配置分块大小、重叠窗口和检索 TopK；页面说明哪些参数影响后续入库，哪些立即影响问答。
+分块参数、召回候选数、融合保留条数、语义重排开关与重排保留条数、相似度阈值滑块集中在一页；页面说明哪些参数影响后续入库，哪些立即影响问答。
 
 ![系统设置](docs/assets/screenshots/settings.jpg)
 
@@ -66,19 +66,20 @@
 - **角色与知识库授权**：在角色管理页勾选可访问知识库；员工可有多个角色，可读知识库取并集。业务角色只能读取文档和问答；内置“系统管理员”拥有全部知识库与系统管理权限，不能删除或缩权，不能移除最后一名系统管理员。使用中的角色须先调整关联用户才能删除。知识库侧提供已授权角色的只读视图，授权统一在角色管理维护。
 - **个人安全**：个人改密或管理员重置密码后，该账号的旧 JWT 立即失效；新密码要求 6～128 位且非全空白。登录响应和浏览器用户缓存仅保留公开字段。
 - **多知识库**：管理员创建 / 编辑 / 删除知识库，用户仅能查看已授权知识库的列表、统计、文件及分块。
-- **文件管理**：支持 `md` / `txt` / `docx` / `pdf` / `pptx`；管理员可在指定知识库内一次最多上传 10 个文件，解析、切分和向量化在后台执行，状态为“处理中 / 就绪 / 失败”。
+- **文件管理**：支持 `md` / `txt` / `docx` / `pdf` / `pptx`（pptx 按页拆分，页标题作层级、演讲者备注带【备注】前缀）；表格感知分块保留 Markdown 表格结构。管理员可在指定知识库内一次最多上传 10 个文件，解析、切分和向量化在后台执行，状态为“处理中 / 就绪 / 失败”。
 - **智能问答**：默认检索全部可访问知识库，也可限定单库；支持流式输出、多轮上下文记忆、会话列表和历史记录恢复；首轮回答后自动生成简洁会话标题；知识库未命中内容时如实说明，不编造答案。
-- **混合检索**：pgvector 向量检索 + PostgreSQL 全文检索（zhparser 中文分词，GIN 索引），通过 RRF 融合排序；向量或关键词通道异常时自动降级为单通道结果。
+- **三段式混合检索**：向量检索（pgvector，HNSW 索引，相似度阈值过滤）与关键词检索（zhparser 中文分词 + GIN 索引，AND 零命中 OR 兜底）各取“召回候选数”，RRF 融合后保留“融合保留条数”，开启语义重排时精排后取“重排保留条数”送大模型；各级条数与阈值均可在设置页调整。向量或关键词通道异常时自动降级为单通道结果，向量零命中时保守返回空。
+- **语义重排（Rerank）**：设置页开关，调用 DashScope `gte-rerank-v2` 对融合候选按相关性重新打分排序；重排服务未配置或调用失败时自动按融合顺序降级，不影响问答可用性。
 - **文件更新保护**：单文件默认上限 50MB；更新成功后才切换分块并递增版本，失败保留原文件和分块。
-- **来源引用**：正文使用数字角标；来源弹窗按需加载单个分块并核对文件版本。旧格式仅展示保存的摘要，文件更新或删除后明确提示失效。
-- **性能与上下文**：启动时为 `chunks.embedding` 创建 HNSW 余弦相似度索引；发送给大模型的最近历史消息默认限制为 20 条；超过 30 条后自动将旧消息压缩为摘要，与最近 20 条一起传给大模型。
-- **系统设置**：管理员可配置分块大小、重叠窗口和 TopK。
+- **来源引用**：正文使用数字角标；来源弹窗按需加载单个分块并核对文件版本，文件更新或删除后明确提示失效。
+- **性能与上下文**：启动时为 `chunks.embedding` 创建 HNSW 余弦相似度索引；发送给大模型的最近历史消息默认限制为 20 条，更早的旧消息累积满一批后自动滚动压缩为摘要，与最近消息一起传给大模型，避免上下文无限增长。
+- **系统设置**：管理员可配置分块大小、重叠窗口、召回候选数、融合保留条数、重排保留条数、语义重排开关与相似度阈值（0.1～0.9 步长 0.1 的滑块）。
 - **安全**：按客户端来源 IP 限流，默认 15 分钟内累计失败 5 次后限制该来源 15 分钟；仅信任明确代理，计数有过期清理与容量上限。敏感操作审计日志落库。
-- **自动化测试**：覆盖认证与令牌撤销、会话范围、文件更新回滚、引用加载、启动异常隔离及代理来源识别；前端使用 Node 内置测试。
+- **自动化测试**：后端覆盖认证与令牌撤销、会话范围、检索回归、重排链路、文件更新回滚、引用加载、启动异常隔离及代理来源识别，默认使用隔离 SQLite 与模拟模型；前端使用 Node 内置测试。
 
 会话默认使用创建时全部可访问知识库，也可限定单库；创建后范围固定，新增授权需新建会话才能纳入。撤销知识库权限后，相关会话列表、历史、来源与后续问答均不可访问；进行中的回答会停止并提示权限变更，已经展示的内容无法撤回。重新授权后可再次读取本次角色系统下的历史，但作废的模型上下文不会恢复。首版不提供部门继承或文档级授权。删除有关联会话的知识库或有关联数据的用户会返回 `409`。
 
-全新安装的默认管理员账号：`admin / 123456`，首次启动自动创建并关联内置“系统管理员”角色，请尽快修改密码。已有数据库须先按下方升级说明迁移，不会为旧非管理员自动授权。
+全新安装的默认管理员账号：`admin / 123456`，首次启动自动创建并关联内置“系统管理员”角色，请尽快修改密码。
 
 ## 技术栈
 
@@ -88,8 +89,9 @@
 | 后端 | Python 3.13 + FastAPI + SQLAlchemy Async |
 | 编排 | LangChain 1.x / LangGraph |
 | 向量库 | pgvector（PostgreSQL 扩展，向量与 chunk 同库同事务） |
-| 关系库 | PostgreSQL（本地 Docker） |
+| 关系库 | PostgreSQL（Docker，自建 pgvector + zhparser 镜像） |
 | Embedding | 默认 Ollama `bge-m3`；支持 OpenAI 兼容在线模型（如阿里云百炼） |
+| 重排 | DashScope text-rerank 协议（`gte-rerank-v2`），可选 |
 | 对话模型 | OpenAI 兼容协议（默认火山方舟，可替换其他供应商） |
 | 对话记忆 | LangGraph Postgres Checkpoint |
 
@@ -105,7 +107,8 @@ backend/
     routers/              # auth / users / roles / knowledge-bases / files / chunks / chat / settings
     services/
       document_service.py # 文档解析、分块、向量化、状态回写
-      retrieval_service.py# 向量 + 关键词混合检索，单通道异常时自动降级
+      retrieval_service.py# 向量 + 关键词混合检索、RRF 融合、可选重排与降级
+      rerank_service.py   # 语义重排客户端（DashScope text-rerank）
       rag_service.py      # LangGraph RAG 编排
       settings_service.py # 运行时系统设置
   requirements.txt
@@ -125,17 +128,20 @@ docs/                     # 需求、设计和专项方案
 2. Node.js 20.19+（20.x）或 22.12+ / npm（按当前 Vite 的 engines 要求）
 3. Docker 运行中的 PostgreSQL
 4. Embedding 服务：默认使用 Ollama，并已拉取 `EMBED_MODEL`（默认 `bge-m3`）；也可改用 OpenAI 兼容在线模型
-5. 大模型 API Key（OpenAI 兼容协议）
+5. 大模型 API Key（OpenAI 兼容协议）；如需语义重排，另备 DashScope API Key
 
 ## 启动步骤
 
 ### 1. 启动 PostgreSQL
 
-本机已创建的容器名为 `my-postgres`：
+需要一个带 pgvector 与 zhparser 扩展的 PostgreSQL 16。可用自建镜像：
 
 ```bash
-docker start my-postgres
+docker build -f backend/docker/Dockerfile.pgvector -t knowledge-qa/pg16-zhparser:latest .
+docker run -d --name my-postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 knowledge-qa/pg16-zhparser:latest
 ```
+
+已有容器直接 `docker start my-postgres`。zhparser 扩展不可用时系统自动降级为纯向量检索并记日志；调整分词参数或自定义词典后需在库内执行 `REINDEX INDEX idx_chunks_content_fts`。
 
 ### 2. 配置后端环境
 
@@ -151,8 +157,6 @@ copy .env.example .env
 
 ### 3. 启动后端
 
-以下首次初始化说明适用于空数据库。已有数据库请先停止后端、备份并完成[角色权限迁移](docs/角色权限迁移.md)，再启动新版本。
-
 ```bash
 cd backend
 .venv\Scripts\python run.py
@@ -162,7 +166,7 @@ Windows 下必须使用 `run.py` 启动，因为它会为 psycopg Async 指定 `
 
 首次启动会自动：
 
-- 创建数据表；
+- 创建数据表并补齐系统设置列；
 - 创建内置“系统管理员”角色及关联的默认管理员 `admin / 123456`；
 - 创建「默认知识库」；
 - 初始化 LangGraph Postgres Checkpoint；
@@ -182,31 +186,30 @@ npm run dev
 
 ## 配置说明
 
-`backend/.env` 主要配置：
+`backend/.env` 主要配置（每个字段的逐条注释见 `backend/.env.example`）：
 
 | 配置项 | 说明 |
 |---|---|
 | `DATABASE_URL` | PostgreSQL 连接串 |
-| `UPLOAD_DIR` / `EMBED_DIM` | 上传文件目录、向量维度（默认 1024，对应 bge-m3） |
-| `CHUNK_SIZE` / `CHUNK_OVERLAP` | 分块参数默认值 |
-| `TOP_K` | TopK 默认值 |
-| `RETRIEVAL_MIN_SCORE` | 向量相似度阈值（默认 `0.5`，越低越宽松） |
-| MAX_HISTORY_MESSAGES | 发送给大模型的最近历史消息数（默认 20） |
-| SUMMARY_TRIGGER_MESSAGES | 总消息数达到此值后触发摘要（默认 30） |
-| SUMMARY_BATCH_SIZE | 每次摘要处理的旧消息条数（默认 10） |
-| MAX_UPLOAD_MB | 单个上传文件大小上限，单位 MB（默认 50） |
+| `UPLOAD_DIR` | 上传文件目录 |
+| `EMBED_DIM` | PostgreSQL 向量列维度（默认 1024，对应 bge-m3；换维度需清空 chunks 并调整列宽） |
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` | 分块参数种子值 |
+| `TOP_K` / `RRF_TOP_N` / `TOP_N` | 每路召回候选数 / RRF 融合后保留条数 / 重排后送大模型条数（默认 30 / 20 / 5） |
+| `RETRIEVAL_MIN_SCORE` | 向量召回相似度阈值（默认 `0.5`，仅作用于向量路） |
+| `MAX_HISTORY_MESSAGES` / `SUMMARY_BATCH_SIZE` | 发送给大模型的最近历史消息数（默认 20）/ 摘要压缩批大小（默认 10） |
+| `MAX_UPLOAD_MB` | 单个上传文件大小上限，单位 MB（默认 50） |
 | `EMBED_PROVIDER` | Embedding 供应商：`ollama` 或 `openai` |
 | `OLLAMA_BASE_URL` / `EMBED_MODEL` | 本地 Embedding 服务和模型 |
-| `EMBED_OPENAI_BASE_URL` / `EMBED_OPENAI_API_KEY` | OpenAI 兼容在线 Embedding 地址和密钥 |
-| `EMBED_OPENAI_DIMENSIONS` / `EMBED_DIM` | 在线模型输出维度和 PostgreSQL 向量列维度，必须一致 |
+| `EMBED_OPENAI_BASE_URL` / `EMBED_OPENAI_API_KEY` / `EMBED_OPENAI_DIMENSIONS` | OpenAI 兼容在线 Embedding 地址、密钥与输出维度 |
+| `RERANK_PROVIDER` / `RERANK_MODEL` / `RERANK_API_KEY` / `RERANK_BASE_URL` | 语义重排连接配置（`none` 时不调用） |
 | `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | 大模型接口配置（OpenAI 兼容协议） |
 | `JWT_SECRET` / `JWT_EXPIRE_HOURS` | JWT 签发配置 |
 | `LOGIN_MAX_ATTEMPTS` / `LOGIN_LOCK_MINUTES` | 来源 IP 的失败阈值、计数窗口及限制时长，默认 5 次 / 15 分钟 |
 | `TRUSTED_PROXY_IPS` | 可信代理地址列表，本地默认 `127.0.0.1,::1`；Compose 使用固定前端代理地址 |
 
-注意：管理员在「系统设置」页保存的 `CHUNK_SIZE`、`CHUNK_OVERLAP`、`TOP_K` 优先于 `.env` 中的默认值。
+注意：管理员在「系统设置」页保存的 `chunk_size`、`chunk_overlap`、`top_k`、`rrf_top_n`、`top_n`、`rerank_enabled`、`retrieval_min_score` 优先于 `.env` 中的默认值；`.env` 中的检索参数仅作为首次初始化的种子值。
 
-切换在线 Embedding 时，请确认 `EMBED_DIM` 与模型输出维度一致。例如阿里云百炼 `text-embedding-v3` 可配置 `1024`。不同维度模型之间切换需要清空并重建已有向量数据。
+切换在线 Embedding 时，请确认 `EMBED_OPENAI_DIMENSIONS` 与 `EMBED_DIM` 一致（例如阿里云百炼 `text-embedding-v3` 可配置 `1024`）。不同模型的向量空间不可混用，切换后需要清空并重建已有向量数据。
 
 ## Docker 部署
 
@@ -216,11 +219,11 @@ npm run dev
 docker compose up -d --build
 ```
 
-浏览器访问 `http://localhost:8080`（通过 `FRONTEND_PORT` 变量可修改端口）。数据通过 Docker Volume 持久化。
+浏览器访问 `http://localhost:8080`（通过 `FRONTEND_PORT` 变量可修改端口）。数据库和上传文件通过 Docker Volume 持久化。
 
 登录限流依赖可信代理边界：Compose 将前端代理固定在 `172.30.250.3`，后端只信任该地址。若代理网段与本机网络冲突，在根目录 `.env` 同时调整 `QA_PROXY_SUBNET`（默认 `172.30.250.0/24`）和其内的 `QA_PROXY_IP`，然后重建服务网络，无需删除数据卷。额外反向代理及多实例部署参见 [登录防暴力破解设计](docs/登录防暴力破解设计.md)，不要将可信代理配置为 `*`。
 
-数据库使用自建镜像（backend/docker/Dockerfile.pgvector，基于 pgvector/pgvector:pg16 编译 SCWS + zhparser）。调整 zhparser 分词参数或自定义词典后需在库内执行 REINDEX INDEX idx_chunks_content_fts。
+数据库使用自建镜像（backend/docker/Dockerfile.pgvector，基于 pgvector/pgvector:pg16 编译 SCWS + zhparser）。
 
 ## 运行测试
 
@@ -238,27 +241,7 @@ node --test tests/*.spec.js
 npm run build
 ```
 
-后端默认使用 隔离临时 SQLite和模拟模型，不需要真实模型服务；两项真实检索回归默认跳过。集成验证需准备 PostgreSQL、Embedding 服务及 `tests/test_retrieval_regression.py` 中配置的知识库/样例文件，按实际环境调整 ID 和预期来源；在 `backend/` 设置 `$env:RUN_RETRIEVAL_TESTS='1'` 后运行 `.\.venv\Scripts\python.exe -m pytest tests/test_retrieval_regression.py -q`。全文检索验证需设置 `FTS_POSTGRES_TESTS=1`（需要带 zhparser 的 PostgreSQL）。角色权限测试覆盖角色分配、知识库隔离、撤权与前端身份刷新；具体通过数量以本地运行结果为准，不包含 Docker 端到端部署或并发压测。
-
-## 升级说明
-
-本次角色权限按全新系统接口交付，不兼容旧 `role` 枚举接口或旧会话。已有知识库、文件和向量保留；启用前的会话不再开放，旧模型 Checkpoint 不再用于问答。
-
-已有数据库必须先停止旧后端，并备份数据库和原始上传文件。**首次执行角色迁移会永久删除旧会话及消息，并移除 `users.role` 列；恢复这些数据必须使用迁移前备份。** 已完成角色初始化后重复执行不会清理新会话。跨库范围迁移仅增加字段，不删除会话。从项目根目录依次进行只读预检与明确应用，确认成功后再启动新版本：
-
-```powershell
-.\backend\.venv\Scripts\python.exe backend/scripts/migrate_roles.py --plan
-.\backend\.venv\Scripts\python.exe backend/scripts/migrate_roles.py --apply
-.\backend\.venv\Scripts\python.exe backend/scripts/migrate_chat_scope.py --plan
-.\backend\.venv\Scripts\python.exe backend/scripts/migrate_chat_scope.py --apply
-```
-
-迁移会为原管理员关联内置系统管理员角色，旧非管理员保持零角色、零知识库权限，须由管理员显式分配。它不会创建“原有访问”等兼容角色。详细前提、影响和恢复边界参见[角色权限迁移](docs/角色权限迁移.md)和[跨库问答说明](docs/跨库问答说明.md)。跨库初始化仅增加会话范围字段，不清理现有角色系统下的单库会话。
-
-- 用户接口改为 `roles` / `is_admin`；创建及分配角色传非空 `role_ids`，不再接受旧 `role` 字段。
-- 浏览器启动时丢弃旧用户身份缓存，重新请求当前身份后才展示权限；升级后请重新登录。
-- 引用全文不保留跨弹窗缓存。缺少稳定定位信息的旧引用无法恢复完整历史原文；文件更新后，旧引用只能展示消息中保存的摘要。
-- 来源限流为单进程内存状态，重启清空，同一公网 NAT 地址共享额度。多实例和额外反向代理需单独设计统一限流与信任边界。
+后端测试默认使用隔离临时 SQLite 和模拟模型，不需要真实模型服务；两项真实检索回归默认跳过。集成验证需准备 PostgreSQL、Embedding 服务及 `tests/test_retrieval_regression.py` 中配置的知识库/样例文件，按实际环境调整 ID 和预期来源；在 `backend/` 设置 `$env:RUN_RETRIEVAL_TESTS='1'` 后运行 `.\.venv\Scripts\python.exe -m pytest tests/test_retrieval_regression.py -q`。全文检索验证需设置 `FTS_POSTGRES_TESTS=1`（需要带 zhparser 的 PostgreSQL）。具体通过数量以本地运行结果为准，不包含 Docker 端到端部署或并发压测。
 
 ## 使用流程
 
@@ -268,7 +251,7 @@ npm run build
 4. 管理员进入「角色管理」，创建业务角色并勾选其可访问知识库；空授权角色可登录但不能读取文档或问答。
 5. 进入「用户管理」新增员工，明确选择至少一个初始角色；多个角色的知识库权限取并集，后续可调整。知识库中的「授权角色」入口只读查看对应关系。
 6. 员工进入「对话」，直接提问，默认检索全部可访问知识库；也可在输入框左下角限定单库。首条消息自动创建会话；左侧只列出当前仍有权限的会话。
-7. 管理员可在右上角进入「系统设置」，调整检索与分块参数。
+7. 管理员可在右上角进入「系统设置」，调整分块与检索参数：召回候选数、融合保留条数、语义重排开关、重排保留条数与相似度阈值滑块。
 
 ## 文档
 
@@ -278,12 +261,10 @@ npm run build
 - [`docs/关键词检索优化设计.md`](docs/关键词检索优化设计.md)
 - [`docs/异步向量化设计.md`](docs/异步向量化设计.md)
 - [`docs/docx切分优化设计.md`](docs/docx切分优化设计.md)
-- [角色权限迁移](docs/角色权限迁移.md)
-- [跨库问答说明](docs/跨库问答说明.md)
-- [`docs/pgvector迁移设计.md`](docs/pgvector迁移设计.md)
+- [`docs/在线向量模型配置设计.md`](docs/在线向量模型配置设计.md)
 - [`docs/登录防暴力破解设计.md`](docs/登录防暴力破解设计.md)
 - [docs/审计日志与自动化测试设计.md](docs/审计日志与自动化测试设计.md)
 - [docs/对话上下文摘要策略设计.md](docs/对话上下文摘要策略设计.md)
-- [docs/变更记录.md](docs/变更记录.md)
+- [`docs/变更记录.md`](docs/变更记录.md)
 
 后续以这些文档作为需求与实现对齐基线。

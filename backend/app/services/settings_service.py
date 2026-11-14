@@ -14,6 +14,9 @@ async def get_system_settings(db: AsyncSession) -> SystemSetting:
         chunk_size=settings.chunk_size,
         chunk_overlap=settings.chunk_overlap,
         top_k=settings.top_k,
+        rrf_top_n=settings.rrf_top_n,
+        top_n=settings.top_n,
+        retrieval_min_score=settings.retrieval_min_score,
     )
     db.add(record)
     await db.flush()

@@ -68,8 +68,17 @@ async def _initialize_database() -> None:
         ))
         await conn.execute(text(
             "INSERT INTO system_settings (id, chunk_size, chunk_overlap, top_k) "
-            "SELECT 1, 800, 100, 5 WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE id=1)"
+            "SELECT 1, 800, 100, 30 WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE id=1)"
         ))
+        # 已有库升级：system_settings 补齐 rerank 列（幂等）
+        await conn.execute(text(
+            "ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS rerank_enabled BOOLEAN NOT NULL DEFAULT false"))
+        await conn.execute(text(
+            "ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS rrf_top_n INTEGER NOT NULL DEFAULT 20"))
+        await conn.execute(text(
+            "ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS top_n INTEGER NOT NULL DEFAULT 5"))
+        await conn.execute(text(
+            "ALTER TABLE system_settings ADD COLUMN IF NOT EXISTS retrieval_min_score DOUBLE PRECISION NOT NULL DEFAULT 0.5"))
         kb = (await conn.execute(text("SELECT id FROM knowledge_bases LIMIT 1"))).first()
         if kb is None:
             admin_id = (await conn.execute(text(

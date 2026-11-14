@@ -4,7 +4,7 @@ import { ElMessage } from "element-plus";
 import { Check, RefreshLeft } from "@element-plus/icons-vue";
 import { api } from "../store";
 
-const form = reactive({ chunk_size: 800, chunk_overlap: 100, top_k: 5 });
+const form = reactive({ chunk_size: 800, chunk_overlap: 100, top_k: 30, rerank_enabled: false, rrf_top_n: 20, top_n: 5, retrieval_min_score: 0.5 });
 const formRef = ref(null);
 const saving = ref(false);
 
@@ -14,7 +14,12 @@ const rules = {
     { required: true, message: "请输入重叠窗口", trigger: "blur" },
     { validator: validateOverlap, trigger: "blur" },
   ],
-  top_k: [{ required: true, message: "请输入 TopK", trigger: "blur" }],
+  top_k: [{ required: true, message: "请输入召回候选数", trigger: "blur" }],
+  rrf_top_n: [{ required: true, message: "请输入融合保留条数", trigger: "blur" }],
+  top_n: [
+    { required: true, message: "请输入重排保留条数", trigger: "blur" },
+    { validator: validateTopN, trigger: "blur" },
+  ],
 };
 
 async function loadSettings() {
@@ -30,11 +35,20 @@ function validateOverlap(rule, value, callback) {
   }
 }
 
+function validateTopN(rule, value, callback) {
+  if (value > form.rrf_top_n) {
+    callback(new Error("重排保留条数不能大于融合保留条数"));
+  } else {
+    callback();
+  }
+}
+
 async function saveSettings() {
   await formRef.value.validate();
   saving.value = true;
   try {
-    await api.put("/settings", form);
+    const payload = { ...form, retrieval_min_score: Math.round(form.retrieval_min_score * 10) / 10 };
+    await api.put("/settings", payload);
     ElMessage.success("设置已保存");
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || "保存失败");
@@ -54,7 +68,7 @@ onMounted(loadSettings);
         class="notice"
         type="info"
         show-icon
-        title="分块设置只影响之后上传或更新的文件；TopK 立即影响问答检索。"
+        title="分块设置只影响之后上传或更新的文件；检索参数立即生效。"
       />
 
       <el-form
@@ -72,9 +86,32 @@ onMounted(loadSettings);
           <el-input-number v-model="form.chunk_overlap" :min="0" :max="1000" />
           <span class="field-tip">相邻分块之间保留的重复字符数</span>
         </el-form-item>
-        <el-form-item label="TopK" prop="top_k">
+        <el-form-item label="召回候选数" prop="top_k">
           <el-input-number v-model="form.top_k" :min="1" :max="50" />
-          <span class="field-tip">每次问答检索的知识块数量</span>
+          <span class="field-tip">向量与关键词检索各路召回的候选条数</span>
+        </el-form-item>
+        <el-form-item label="融合保留条数" prop="rrf_top_n">
+          <el-input-number v-model="form.rrf_top_n" :min="1" :max="100" />
+          <span class="field-tip">多路召回融合后保留的候选条数</span>
+        </el-form-item>
+        <el-form-item label="语义重排">
+          <el-switch v-model="form.rerank_enabled" />
+          <span class="field-tip">开启后按相关性对候选重新排序（需在 .env 配置重排服务）</span>
+        </el-form-item>
+        <el-form-item label="重排保留条数" prop="top_n">
+          <el-input-number v-model="form.top_n" :min="1" :max="100" :disabled="!form.rerank_enabled" />
+          <span class="field-tip">重排后送入大模型的知识块数量</span>
+        </el-form-item>
+        <el-form-item label="相似度阈值" prop="retrieval_min_score">
+          <el-slider
+            v-model="form.retrieval_min_score"
+            class="score-slider"
+            :min="0.1"
+            :max="0.9"
+            :step="0.1"
+            show-input
+          />
+          <span class="field-tip">向量召回的相关度下限，低于阈值的候选不进入融合</span>
         </el-form-item>
 
         <el-form-item>
@@ -117,5 +154,9 @@ onMounted(loadSettings);
   margin-left: 12px;
   color: var(--color-text-secondary);
   font-size: 12px;
+}
+
+.score-slider {
+  width: 420px;
 }
 </style>

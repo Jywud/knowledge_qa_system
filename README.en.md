@@ -2,11 +2,11 @@
 
 [简体中文](./README.md) | [English](./README.en.md)
 
-A full-stack enterprise knowledge base QA system with account authentication, role-based knowledge-base access, multi-knowledge-base management, document parsing and chunking, hybrid retrieval, streaming multi-turn conversations, and source citations.
+A full-stack enterprise knowledge base QA system with account authentication, role-based knowledge-base access, multi-knowledge-base management, document parsing and chunking, hybrid retrieval with optional semantic reranking, streaming multi-turn conversations, and source citations.
 
 ## Screenshots
 
-These screenshots show the current version in an isolated local demo with sample accounts and documents. They cover role-based access, cross-library Q&A and administration. Click images to view them at full size. The interface is in Chinese.
+These screenshots show the system in an isolated local demo with sample accounts and documents. They cover role-based access, cross-library Q&A and administration. Click images to view them at full size. The interface is in Chinese.
 
 | Login | Home workspace |
 |---|---|
@@ -54,7 +54,7 @@ The user list displays multiple role tags. New users require at least one explic
 
 ### System settings
 
-Configure chunk size, overlap and retrieval TopK, with guidance on which settings affect future ingestion or current retrieval.
+Chunking, recall, fusion, reranking and the similarity threshold slider are grouped on one page, with guidance on which settings affect future ingestion or current retrieval.
 
 ![System settings](docs/assets/screenshots/settings.jpg)
 
@@ -66,18 +66,19 @@ Configure chunk size, overlap and retrieval TopK, with guidance on which setting
 - **Roles and knowledge-base access**: select accessible knowledge bases on the role management page. Employees may hold multiple roles and receive the union of their authorized knowledge bases. Business roles grant document reading and Q&A only. The built-in system administrator role has access to all knowledge bases and system management; it cannot be deleted or reduced, and the last administrator cannot be removed. Reassign users before deleting an occupied role. Each knowledge base has a read-only view of authorized roles; edit grants in role management.
 - **Personal security**: password changes and admin resets invalidate existing JWTs. New passwords require 6–128 characters and cannot be all whitespace. Login responses and browser user storage contain only public user fields.
 - **Multi-knowledge-base support**: admins can create, edit, and delete knowledge bases. Users can only view authorized knowledge bases, their statistics, files, and chunks.
-- **File management**: supports `md`, `txt`, `docx`, `pdf`, and `pptx`. Admins can upload up to 10 files at a time to a selected knowledge base. Parsing, chunking, and embedding run in the background with statuses `processing`, `ready`, or `failed`.
+- **File management**: supports `md`, `txt`, `docx`, `pdf`, and `pptx` (pptx files are split per slide, with slide titles as hierarchy and speaker notes prefixed); table-aware chunking preserves Markdown table structure. Admins can upload up to 10 files at a time to a selected knowledge base. Parsing, chunking, and embedding run in the background with statuses `processing`, `ready`, or `failed`.
 - **AI Q&A**: users search all accessible knowledge bases by default and may optionally narrow a new conversation to one knowledge base. Responses stream token by token, preserve multi-turn context, auto-generate a concise conversation title after the first answer, and honestly state when the knowledge base has no relevant content instead of making up answers.
-- **Hybrid retrieval**: pgvector semantic search combined with PostgreSQL full-text search (zhparser Chinese word segmentation, GIN index), fused with Reciprocal Rank Fusion (RRF); when either the vector or keyword channel fails, results automatically fall back to the single healthy channel.
-- **Safe updates and citations**: uploads default to a 50MB per-file limit. Successful updates replace chunks and increment the version; failures preserve original data. Inline citation badges load individual chunks with file/version checks; legacy references show saved excerpts.
-- **Performance and context**: an HNSW cosine similarity index is created for `chunks.embedding` at startup. The recent conversation history sent to the LLM is limited to 20 messages by default. When total messages exceed 30, older messages are automatically compressed into a summary and combined with the recent 20 for the LLM.
-- **System settings**: admins can configure chunk size, chunk overlap, and TopK.
+- **Three-stage hybrid retrieval**: vector search (pgvector with an HNSW index, filtered by a similarity threshold) and keyword search (zhparser Chinese word segmentation + GIN index, with an OR fallback when AND matches nothing) each take "recall candidates per channel"; RRF fusion keeps the "fusion keep count"; when semantic reranking is enabled, the top "rerank keep count" chunks go to the LLM. All counts and the threshold are adjustable on the settings page. If either channel fails, results fall back to the single healthy channel; an empty vector result conservatively returns nothing.
+- **Semantic reranking (Rerank)**: a settings-page toggle calls DashScope `gte-rerank-v2` to rescore fused candidates by relevance. If the rerank service is not configured or the call fails, the system degrades to fusion order without affecting availability.
+- **Safe updates and citations**: uploads default to a 50MB per-file limit. Successful updates replace chunks and increment the version; failures preserve original data. Inline citation badges load individual chunks with file/version checks, and clearly mark sources as stale after file updates or deletion.
+- **Performance and context**: an HNSW cosine similarity index is created for `chunks.embedding` at startup. The recent conversation history sent to the LLM is limited to 20 messages by default; older messages are compressed into a rolling summary once a batch accumulates, keeping the context bounded without losing long-term information.
+- **System settings**: admins can configure chunk size, chunk overlap, recall candidates, fusion keep count, rerank keep count, the rerank toggle, and a similarity threshold slider (0.1–0.9, step 0.1).
 - **Security**: login attempts are limited by client IP with expiry and bounded storage. By default, five failures within 15 minutes block that source for 15 minutes. Trusted proxies overwrite external forwarding headers. Sensitive operations are audited.
-- **Automated tests**: core flows cover login, user management, file upload, and docx-aware splitting. Optional retrieval regression cases are also available.
+- **Automated tests**: the backend covers authentication and token revocation, conversation scope, retrieval regression, the rerank pipeline, file-update rollback, citation loading, startup failure isolation, and proxy source identification, using an isolated SQLite database and mocked models by default. The frontend uses Node's built-in test runner.
 
-For a fresh installation, `admin / 123456` is created on first startup and assigned the built-in system administrator role. Change the password immediately. Existing databases require the migration below; existing non-administrators receive no automatic grants.
+Conversations snapshot all accessible knowledge bases at creation by default, or may be limited to one. The scope stays fixed; start a new conversation to include newly granted libraries. Revoking access hides related conversation lists, history and citations, blocks subsequent questions, and stops an active answer with a permission-change message. Content already displayed cannot be recalled. Reauthorization restores access to history, but invalidated model context is not restored. Department inheritance and document-level grants are outside this release. Deleting a knowledge base with conversations or a user with related records returns `409`.
 
-Conversations snapshot all accessible knowledge bases at creation by default, or may be limited to one. The scope stays fixed; start a new conversation to include newly granted libraries. Revoking access hides related conversation lists, history and citations, blocks subsequent questions, and stops an active answer with a permission-change message. Content already displayed cannot be recalled. Reauthorization restores access to history created under the new role system, but invalidated model context is not restored. Department inheritance and document-level grants are outside this release. Deleting a knowledge base with conversations or a user with related records returns `409`.
+For a fresh installation, `admin / 123456` is created on first startup and assigned the built-in system administrator role. Change the password immediately.
 
 ## Tech Stack
 
@@ -87,8 +88,9 @@ Conversations snapshot all accessible knowledge bases at creation by default, or
 | Backend | Python 3.13 + FastAPI + SQLAlchemy Async |
 | Orchestration | LangChain 1.x / LangGraph |
 | Vector store | pgvector (PostgreSQL extension; vectors and chunks share one transactional database) |
-| Relational database | PostgreSQL (Docker) |
+| Relational database | PostgreSQL (Docker, custom pgvector + zhparser image) |
 | Embedding | Ollama `bge-m3` by default; OpenAI-compatible online embedding APIs are also supported |
+| Reranking | DashScope text-rerank protocol (`gte-rerank-v2`), optional |
 | Chat model | OpenAI-compatible API (Volcengine Ark by default, replaceable) |
 | Conversation memory | LangGraph Postgres Checkpoint |
 
@@ -97,14 +99,15 @@ Conversations snapshot all accessible knowledge bases at creation by default, or
 ```text
 backend/
   app/
-    main.py               # Application entry: migrations, startup checks, Graph setup
+    main.py               # Application entry: table creation, data initialization, Graph setup
     config.py             # Reads backend/.env
     models.py             # SQLAlchemy models
     auth.py               # JWT, password hashing, current-user/admin dependencies
     routers/              # auth / users / roles / knowledge-bases / files / chunks / chat / settings
     services/
       document_service.py # Document parsing, chunking, embedding, status updates
-      retrieval_service.py# pgvector + keyword hybrid retrieval with single-channel fallback
+      retrieval_service.py# Vector + keyword hybrid retrieval, RRF fusion, optional reranking and fallback
+      rerank_service.py   # Semantic rerank client (DashScope text-rerank)
       rag_service.py      # LangGraph RAG orchestration
       settings_service.py # Runtime system settings
   requirements.txt
@@ -124,17 +127,20 @@ docs/                     # Chinese requirements and design documents
 2. Node.js 20.19+ (20.x) or 22.12+ / npm, as required by the current Vite package
 3. Docker running PostgreSQL
 4. An embedding service: Ollama with `EMBED_MODEL` pulled by default (`bge-m3`), or an OpenAI-compatible online embedding provider
-5. An OpenAI-compatible LLM API key
+5. An OpenAI-compatible LLM API key; a DashScope API key as well if you want semantic reranking
 
 ## Local Development
 
 ### 1. Start PostgreSQL
 
+You need PostgreSQL 16 with the pgvector and zhparser extensions. Build and run the bundled image:
+
 ```bash
-docker start my-postgres
+docker build -f backend/docker/Dockerfile.pgvector -t knowledge-qa/pg16-zhparser:latest .
+docker run -d --name my-postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 knowledge-qa/pg16-zhparser:latest
 ```
 
-If you have not created a PostgreSQL container yet, use a pgvector-enabled PostgreSQL 16 image and expose it on your desired port.
+If you already have a container, `docker start my-postgres` is enough. When the zhparser extension is unavailable, the system automatically degrades to vector-only retrieval and logs a warning; after changing segmentation parameters or custom dictionaries, run `REINDEX INDEX idx_chunks_content_fts` in the database.
 
 ### 2. Configure the backend
 
@@ -150,8 +156,6 @@ Edit `backend/.env`, configure `DATABASE_URL` and `LLM_API_KEY`, and set a rando
 
 ### 3. Start the backend
 
-The initialization below applies to an empty database. For an existing database, stop the backend, back up data, and complete the [role-access migration](docs/角色权限迁移.md) before starting the new version.
-
 ```bash
 cd backend
 .venv\Scripts\python run.py
@@ -161,7 +165,7 @@ On Windows, start the app with `run.py`. It selects `SelectorEventLoop`, which i
 
 On first startup, the backend automatically:
 
-- Creates database tables.
+- Creates database tables and aligns system-settings columns.
 - Creates the built-in system administrator role and the associated default admin account `admin / 123456`.
 - Creates the default knowledge base.
 - Initializes LangGraph Postgres Checkpoint.
@@ -181,31 +185,30 @@ Open http://localhost:5173.
 
 ## Configuration
 
-Important variables in `backend/.env`:
+Important variables in `backend/.env` (per-field comments live in `backend/.env.example`):
 
 | Variable | Description |
 |---|---|
 | `DATABASE_URL` | PostgreSQL connection URL |
-| `UPLOAD_DIR` / `EMBED_DIM` | Upload directory and vector dimension; default `1024` for `bge-m3` |
-| `CHUNK_SIZE` / `CHUNK_OVERLAP` | Default chunking parameters |
-| `TOP_K` | Default number of retrieved chunks |
-| `RETRIEVAL_MIN_SCORE` | Vector similarity threshold; default `0.5`, lower means looser |
-| MAX_HISTORY_MESSAGES | Recent messages sent to the LLM; default 20 |
-| SUMMARY_TRIGGER_MESSAGES | Message count threshold to trigger summarization; default 30 |
-| SUMMARY_BATCH_SIZE | Number of old messages per summarization batch; default 10 |
-| MAX_UPLOAD_MB | Maximum size of a single uploaded file in MB; default 50 |
+| `UPLOAD_DIR` | Upload directory |
+| `EMBED_DIM` | PostgreSQL vector column dimension; default `1024` for `bge-m3` (changing it requires rebuilding chunks and the column) |
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` | Seed chunking parameters |
+| `TOP_K` / `RRF_TOP_N` / `TOP_N` | Recall candidates per channel / chunks kept after RRF fusion / chunks sent to the LLM after reranking (defaults 30 / 20 / 5) |
+| `RETRIEVAL_MIN_SCORE` | Vector similarity threshold; default `0.5`, applies to the vector channel only |
+| `MAX_HISTORY_MESSAGES` / `SUMMARY_BATCH_SIZE` | Recent messages sent to the LLM (default 20) / summarization batch size (default 10) |
+| `MAX_UPLOAD_MB` | Maximum size of a single uploaded file in MB; default 50 |
 | `EMBED_PROVIDER` | Embedding provider: `ollama` or `openai` |
 | `OLLAMA_BASE_URL` / `EMBED_MODEL` | Local embedding service and model |
-| `EMBED_OPENAI_BASE_URL` / `EMBED_OPENAI_API_KEY` | OpenAI-compatible online embedding endpoint and API key |
-| `EMBED_OPENAI_DIMENSIONS` / `EMBED_DIM` | Online model output dimension and PostgreSQL vector column dimension; they must match |
+| `EMBED_OPENAI_BASE_URL` / `EMBED_OPENAI_API_KEY` / `EMBED_OPENAI_DIMENSIONS` | OpenAI-compatible online embedding endpoint, API key, and output dimension |
+| `RERANK_PROVIDER` / `RERANK_MODEL` / `RERANK_API_KEY` / `RERANK_BASE_URL` | Semantic rerank connection settings (no calls when `none`) |
 | `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` | OpenAI-compatible chat model configuration |
 | `JWT_SECRET` / `JWT_EXPIRE_HOURS` | JWT signing settings |
 | `LOGIN_MAX_ATTEMPTS` / `LOGIN_LOCK_MINUTES` | Per-source failure threshold, counting window and block duration; defaults: 5 attempts / 15 minutes |
 | `TRUSTED_PROXY_IPS` | Explicit trusted proxy addresses; locally `127.0.0.1,::1`, overridden by Compose with the frontend proxy address |
 
-Settings saved by an admin in the **System Settings** page override the `.env` defaults for `CHUNK_SIZE`, `CHUNK_OVERLAP`, and `TOP_K`.
+Settings saved by an admin in the **System Settings** page override the `.env` defaults for `chunk_size`, `chunk_overlap`, `top_k`, `rrf_top_n`, `top_n`, `rerank_enabled`, and `retrieval_min_score`; the `.env` retrieval values act as first-initialization seeds.
 
-When switching to an online embedding provider, make sure `EMBED_DIM` matches the model output dimension. For example, Alibaba Cloud DashScope `text-embedding-v3` can use `1024`. Switching to a model with a different dimension requires clearing and rebuilding existing vector data.
+When switching to an online embedding provider, make sure `EMBED_OPENAI_DIMENSIONS` matches `EMBED_DIM` (for example, Alibaba Cloud DashScope `text-embedding-v3` can use `1024`). Vector spaces from different models cannot be mixed; after switching, clear and rebuild existing vector data.
 
 ## Docker Deployment
 
@@ -219,7 +222,7 @@ Open http://localhost:8080. Change the exposed port with the `FRONTEND_PORT` env
 
 Compose assigns the frontend proxy `172.30.250.3` and configures the backend to trust only that address. If this subnet conflicts with an existing network, set both `QA_PROXY_SUBNET` (default `172.30.250.0/24`) and `QA_PROXY_IP` in the root `.env`, then recreate the service network without deleting data volumes. Do not set trusted proxies to `*`. Additional reverse proxies require an explicit trust boundary and header replacement; see [the login protection design](docs/登录防暴力破解设计.md).
 
-The database uses a self-built image (`backend/docker/Dockerfile.pgvector`, compiling SCWS + zhparser on top of `pgvector/pgvector:pg16`). After changing zhparser segmentation parameters or custom dictionaries, run `REINDEX INDEX idx_chunks_content_fts` in the database.
+The database uses a self-built image (`backend/docker/Dockerfile.pgvector`, compiling SCWS + zhparser on top of `pgvector/pgvector:pg16`).
 
 ## Tests
 
@@ -237,27 +240,7 @@ node --test tests/*.spec.js
 npm run build
 ```
 
-Backend tests use isolated temporary SQLite and mocked models by default. Two retrieval cases need local PostgreSQL, an embedding service, and the knowledge base/documents configured in `tests/test_retrieval_regression.py`; adapt its IDs and expected sources to your data. From `backend/`, set `$env:RUN_RETRIEVAL_TESTS='1'` and run `.\.venv\Scripts\python.exe -m pytest tests/test_retrieval_regression.py -q`. Full-text search verification requires setting `FTS_POSTGRES_TESTS=1` (PostgreSQL with zhparser is needed). Role-access tests cover role assignment, knowledge-base isolation, revocation, and frontend identity refresh. Use the current local run for pass counts. Docker deployment and concurrency load testing are not included.
-
-## Upgrade Notes
-
-This release uses a fresh role-based API contract and does not support the old `role` enum API or pre-release conversations. Existing knowledge bases, documents and vectors are retained. Earlier conversations are unavailable, and their model Checkpoints are not reused.
-
-For an existing database, stop the old backend and back up the database and original uploaded files first. **The first role migration permanently deletes old conversations/messages and drops `users.role`; recovery requires the pre-migration backup.** Re-running it after initialization preserves new conversations. The separate scope migration only adds metadata and does not delete conversations. From the repository root, run the read-only plan and then explicitly apply the migration. Start the new backend only after it succeeds:
-
-```powershell
-.\backend\.venv\Scripts\python.exe backend/scripts/migrate_roles.py --plan
-.\backend\.venv\Scripts\python.exe backend/scripts/migrate_roles.py --apply
-.\backend\.venv\Scripts\python.exe backend/scripts/migrate_chat_scope.py --plan
-.\backend\.venv\Scripts\python.exe backend/scripts/migrate_chat_scope.py --apply
-```
-
-Migration assigns former administrators to the built-in system administrator role. Former non-administrators retain zero roles and zero knowledge-base grants until an administrator explicitly assigns roles. No compatibility role preserving shared access is created. See [role-access migration](docs/角色权限迁移.md) and [cross-library Q&A](docs/跨库问答说明.md) for details. The scope migration only adds conversation scope metadata and retains existing single-library conversations.
-
-- User responses contain `roles` and `is_admin`. Creating users and assigning roles require a nonempty `role_ids` array; the old `role` field is no longer accepted.
-- On startup, the browser discards cached user identity and fetches the current identity before displaying permissions. Sign in again after upgrading.
-- Full citation text is fetched on each dialog opening. Legacy references without stable identifiers cannot recover historical full text; old citations for updated files can only show saved excerpts.
-- Limits are per-process and reset on restart. Users sharing a public NAT address share a budget; multiple instances need coordinated rate limiting.
+Backend tests use isolated temporary SQLite and mocked models by default. Retrieval regression cases need local PostgreSQL, an embedding service, and the knowledge base/documents configured in `tests/test_retrieval_regression.py`; adapt its IDs and expected sources to your data. From `backend/`, set `$env:RUN_RETRIEVAL_TESTS='1'` and run `.\.venv\Scripts\python.exe -m pytest tests/test_retrieval_regression.py -q`. Full-text search verification requires setting `FTS_POSTGRES_TESTS=1` (PostgreSQL with zhparser is needed). Use the current local run for pass counts. Docker deployment and concurrency load testing are not included.
 
 ## Usage Flow
 
@@ -267,7 +250,7 @@ Migration assigns former administrators to the built-in system administrator rol
 4. Open **Role Management**, create business roles and select their accessible knowledge bases. Roles without grants can sign in but cannot read documents or ask questions.
 5. Create employees in **User Management** and explicitly select at least one initial role. Multiple roles grant the union of their knowledge bases; assignments can be edited later. The authorized-roles entry on each knowledge base is read-only.
 6. Employees open **Chat** and ask directly across all accessible knowledge bases, or optionally select one. The first message creates a conversation with a fixed scope; the sidebar only lists conversations whose entire scope remains authorized.
-7. Admins can open **System Settings** from the top-right menu to adjust retrieval and chunking parameters.
+7. Admins can open **System Settings** from the top-right menu to adjust chunking and retrieval parameters: recall candidates, fusion keep count, the rerank toggle, rerank keep count, and the similarity threshold slider.
 
 ## Documentation
 
@@ -279,11 +262,10 @@ The design documents are maintained in Chinese:
 - [`docs/关键词检索优化设计.md`](docs/关键词检索优化设计.md)
 - [`docs/异步向量化设计.md`](docs/异步向量化设计.md)
 - [`docs/docx切分优化设计.md`](docs/docx切分优化设计.md)
-- [Role-access migration](docs/角色权限迁移.md)
-- [`docs/pgvector迁移设计.md`](docs/pgvector迁移设计.md)
+- [`docs/在线向量模型配置设计.md`](docs/在线向量模型配置设计.md)
 - [`docs/登录防暴力破解设计.md`](docs/登录防暴力破解设计.md)
 - [docs/审计日志与自动化测试设计.md](docs/审计日志与自动化测试设计.md)
 - [docs/对话上下文摘要策略设计.md](docs/对话上下文摘要策略设计.md)
-- [docs/变更记录.md](docs/变更记录.md)
+- [`docs/变更记录.md`](docs/变更记录.md)
 
 These documents are the baseline for requirements and implementation alignment.

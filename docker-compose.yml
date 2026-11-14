@@ -28,7 +28,10 @@ services:
       UPLOAD_DIR: /app/uploads
       CHUNK_SIZE: ${CHUNK_SIZE:-800}
       CHUNK_OVERLAP: ${CHUNK_OVERLAP:-100}
-      TOP_K: ${TOP_K:-5}
+      TOP_K: ${TOP_K:-30}
+      RRF_TOP_N: ${RRF_TOP_N:-20}
+      TOP_N: ${TOP_N:-5}
+      RETRIEVAL_MIN_SCORE: ${RETRIEVAL_MIN_SCORE:-0.5}
       MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
       EMBED_PROVIDER: ${EMBED_PROVIDER:-ollama}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
@@ -37,6 +40,10 @@ services:
       EMBED_OPENAI_BASE_URL: ${EMBED_OPENAI_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       EMBED_OPENAI_API_KEY: ${EMBED_OPENAI_API_KEY:-}
       EMBED_OPENAI_DIMENSIONS: ${EMBED_OPENAI_DIMENSIONS:-1024}
+      RERANK_PROVIDER: ${RERANK_PROVIDER:-none}
+      RERANK_MODEL: ${RERANK_MODEL:-gte-rerank-v2}
+      RERANK_API_KEY: ${RERANK_API_KEY:-}
+      RERANK_BASE_URL: ${RERANK_BASE_URL:-https://dashscope.aliyuncs.com}
       LLM_BASE_URL: ${LLM_BASE_URL:-https://ark.cn-beijing.volces.com/api/coding/v3}
       LLM_API_KEY: ${LLM_API_KEY}
       LLM_MODEL: ${LLM_MODEL:-deepseek-v4.1-flash}

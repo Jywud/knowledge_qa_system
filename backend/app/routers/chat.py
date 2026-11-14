@@ -152,6 +152,10 @@ async def chat(
     user_msg = HumanMessage(content=body.content)
     system_settings = await get_system_settings(db)
     top_k = system_settings.top_k
+    rrf_top_n = system_settings.rrf_top_n
+    top_n = system_settings.top_n
+    rerank_enabled = system_settings.rerank_enabled
+    min_score = system_settings.retrieval_min_score
     # 设置可能首次创建；提交并释放连接后，流生成只使用基本值快照。
     await db.commit()
     revoked = asyncio.Event()
@@ -176,7 +180,9 @@ async def chat(
         try:
             await queue.put({"type": "start"})
             payload = {"messages": [user_msg], "kb_id": str(kb_id) if kb_id is not None else None,
-                       "kb_ids": scope, "top_k": top_k, "user_id": user_id}
+                       "kb_ids": scope, "top_k": top_k, "rrf_top_n": rrf_top_n,
+                       "rerank_enabled": rerank_enabled, "top_n": top_n,
+                       "retrieval_min_score": min_score, "user_id": user_id}
             # 只有原子落库后保存的指针可延续上下文；失败/撤权任务使用独立线程，不会被复用。
             if previous_thread and previous_thread.startswith(prefix):
                 previous = await graph.aget_state({"configurable": {"thread_id": previous_thread}})

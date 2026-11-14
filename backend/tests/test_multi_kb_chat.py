@@ -111,8 +111,8 @@ async def test_all_scope_keyword_fallback_passes_scope_and_snapshot(client, test
     fts = AsyncMock(return_value=[])
     monkeypatch.setattr(retrieval_service, "_fts_search", fts)
     assert await retrieval_service.hybrid_search("needle", None, 5, user_id=2, kb_ids=[1, 2, 3]) == []
-    # hybrid_search 向关键词通道传 candidate_k = max(top_k * 2, 10)，此处 top_k=5 -> 10
-    assert fts.await_args.args == ("needle", None, 10)
+    # hybrid_search 向每路召回通道传每路候选数 top_k
+    assert fts.await_args.args == ("needle", None, 5)
     assert fts.await_args.kwargs["kb_ids"] == [1, 2, 3]
     assert fts.await_args.kwargs["user_id"] == 2
 

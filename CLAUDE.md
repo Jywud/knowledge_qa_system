@@ -48,7 +48,7 @@ LangGraph 图：`START → summarize → chat`，经 `build_graph(checkpointer)`
 
 ### 混合检索（app/services/retrieval_service.py）
 
-`hybrid_search` = pgvector 余弦检索（阈值 `retrieval_min_score`，HNSW 索引）+ PostgreSQL 全文检索（zhparser 词级分词，表达式 GIN 索引 `idx_chunks_content_fts`，AND 零命中 OR 兜底），RRF（k=60）融合。关键词检索走 `_fts_search`，权限谓词与 `_vector_search` 同构——改检索逻辑时保持返回列集与 `_row_document` 兼容。
+`hybrid_search` = pgvector 余弦检索（阈值 `retrieval_min_score`，HNSW 索引）+ PostgreSQL 全文检索（zhparser 词级分词，表达式 GIN 索引 `idx_chunks_content_fts`，AND 零命中 OR 兜底），RRF（k=60）融合，可选 rerank 精排（`app/services/rerank_service.py`，失败降级）。关键词检索走 `_fts_search`，权限谓词与 `_vector_search` 同构——改检索逻辑时保持返回列集与 `_row_document` 兼容。
 
 ### 文档摄取（app/services/document_service.py）
 
@@ -56,7 +56,7 @@ LangGraph 图：`START → summarize → chat`，经 `build_graph(checkpointer)`
 
 ### 配置优先级
 
-`SystemSetting` 数据库行（管理员在设置页保存）覆盖 `.env` 的 `chunk_size`/`chunk_overlap`/`top_k`；其余配置只读 `.env`。Embedding 提供商可切换：`EMBED_PROVIDER=ollama | openai`（OpenAI 兼容协议，如 DashScope）。
+`SystemSetting` 数据库行（管理员在设置页保存）覆盖 `.env` 的 `chunk_size`/`chunk_overlap`/`top_k`/`rrf_top_n`/`top_n`/`rerank_enabled`/`retrieval_min_score`；其余配置只读 `.env`。Embedding 提供商可切换：`EMBED_PROVIDER=ollama | openai`（OpenAI 兼容协议，如 DashScope）。重排连接配置（`RERANK_PROVIDER=none | dashscope`、`RERANK_MODEL`、`RERANK_API_KEY`、`RERANK_BASE_URL`）只读 `.env`；provider 未配置或调用失败时按融合顺序降级，不影响问答。检索链路：`top_k`（每路召回候选数）→ RRF 融合保留 `rrf_top_n` 条 →（开启语义重排时）精排取 `top_n` 条送 LLM，重排关闭时链路止于 `rrf_top_n`。
 
 ### 前端
 

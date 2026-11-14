@@ -32,11 +32,23 @@ async def update_settings(
         raise HTTPException(400, "重叠窗口必须小于分块大小")
     if body.top_k < 1:
         raise HTTPException(400, "TopK 不能小于 1")
+    if body.rrf_top_n < 1:
+        raise HTTPException(400, "融合保留条数不能小于 1")
+    if body.top_n < 1:
+        raise HTTPException(400, "重排保留条数不能小于 1")
+    if body.top_n > body.rrf_top_n:
+        raise HTTPException(400, "重排保留条数不能大于融合保留条数")
+    if not 0 <= body.retrieval_min_score <= 1:
+        raise HTTPException(400, "相似度阈值需在 0 到 1 之间")
 
     record = await get_system_settings(db)
     record.chunk_size = body.chunk_size
     record.chunk_overlap = body.chunk_overlap
     record.top_k = body.top_k
+    record.rerank_enabled = body.rerank_enabled
+    record.rrf_top_n = body.rrf_top_n
+    record.top_n = body.top_n
+    record.retrieval_min_score = body.retrieval_min_score
     await db.commit()
     await db.refresh(record)
     return record
