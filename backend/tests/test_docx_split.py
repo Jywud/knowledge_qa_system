@@ -75,3 +75,25 @@ def test_docx_split_expands_table_rows(tmp_path):
     contents = [chunk.page_content for chunk in chunks]
 
     assert any("配置项: 服务器名称" in content for content in contents)
+
+
+def test_docx_split_attaches_lead_in_paragraph_to_table(tmp_path):
+    doc = DocxDocument()
+    doc.add_heading("接口参数", level=1)
+    doc.add_paragraph("配置如下：")
+    table = doc.add_table(rows=3, cols=2)
+    table.cell(0, 0).text = "配置项"
+    table.cell(0, 1).text = "说明"
+    table.cell(1, 0).text = "重试次数"
+    table.cell(1, 1).text = "默认 3 次"
+    table.cell(2, 0).text = "超时时间"
+    table.cell(2, 1).text = "30 秒"
+    path = tmp_path / "lead_in.docx"
+    doc.save(str(path))
+
+    chunks = _split_docx(_load_docx(path), 800, 100)
+
+    assert len(chunks) == 1
+    content = chunks[0].page_content
+    assert content.startswith("接口参数\n配置如下：\n\n配置项: 重试次数")
+    assert "超时时间" in content

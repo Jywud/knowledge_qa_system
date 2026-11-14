@@ -198,12 +198,30 @@ def _split_docx(blocks: list, chunk_size: int, chunk_overlap: int) -> list[Docum
                 chunks.extend(splitter.split_text("\n\n".join(paragraph_buffer)))
                 paragraph_buffer.clear()
 
-        for kind, content in section_blocks:
+        block_index = 0
+        while block_index < len(section_blocks):
+            kind, content = section_blocks[block_index]
+            following = section_blocks[block_index + 1] if block_index + 1 < len(section_blocks) else None
+            if (
+                kind == "paragraph"
+                and content.rstrip().endswith(("：", ":"))
+                and following is not None
+                and following[0] == "table"
+            ):
+                # 引导句并入紧邻表格的开头，随首个行组走；连续多段只合并紧邻的那一段
+                grouped = _group_table_rows(following[1], chunk_size)
+                if grouped:
+                    flush_paragraphs()
+                    grouped[0] = f"{content}\n\n{grouped[0]}"
+                    chunks.extend(grouped)
+                    block_index += 2
+                    continue
             if kind == "table":
                 flush_paragraphs()
                 chunks.extend(_group_table_rows(content, chunk_size))
             else:
                 paragraph_buffer.append(content)
+            block_index += 1
         flush_paragraphs()
 
         prefix = f"{path_label}\n" if path_label else ""
