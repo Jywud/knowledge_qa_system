@@ -39,3 +39,28 @@ async def test_vector_failure_falls_back_to_keyword_channel(test_db, monkeypatch
     docs = await retrieval_service.hybrid_search("needle", 1, 5, user_id=2)
     assert [d.metadata["chunk_id"] for d in docs] == ["7"]
     assert docs[0].metadata["file_version"] == 1
+
+
+async def test_fts_failure_falls_back_to_vector_only(test_db, monkeypatch):
+    monkeypatch.setattr(retrieval_service, "get_embeddings", lambda: SimpleNamespace(
+        aembed_query=AsyncMock(return_value=[0.1] * 1024)))
+    doc = Document(page_content="向量原文",
+                   metadata={"chunk_id": "9", "file_id": "1", "chunk_index": "0", "file_version": 2})
+
+    async def broken_fts(query, kb_id, limit, *, user_id=None, kb_ids=None):
+        raise RuntimeError("fts down")
+
+    monkeypatch.setattr(retrieval_service, "_fts_search", broken_fts)
+    monkeypatch.setattr(retrieval_service, "_vector_search", AsyncMock(return_value=[doc]))
+    docs = await retrieval_service.hybrid_search("needle", 1, 5, user_id=2)
+    assert [d.metadata["chunk_id"] for d in docs] == ["9"]
+
+
+async def test_vector_zero_hit_returns_empty_without_fts_fallback(test_db, monkeypatch):
+    monkeypatch.setattr(retrieval_service, "get_embeddings", lambda: SimpleNamespace(
+        aembed_query=AsyncMock(return_value=[0.1] * 1024)))
+    fts = AsyncMock(return_value=[])
+    monkeypatch.setattr(retrieval_service, "_fts_search", fts)
+    monkeypatch.setattr(retrieval_service, "_vector_search", AsyncMock(return_value=[]))
+    assert await retrieval_service.hybrid_search("needle", 1, 5, user_id=2) == []
+    fts.assert_not_awaited()

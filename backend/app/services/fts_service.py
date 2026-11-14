@@ -3,6 +3,10 @@
 调整分词参数（下方 ALTER DATABASE 两项）或检索配置映射后，
 必须重建索引：REINDEX INDEX idx_chunks_content_fts，否则索引与查询的分词口径不一致。
 若库中已存在同名 `zh` 配置，将按现状使用，不校验其分词映射。
+
+注意：OR 兜底的词面单引号转义语义依赖 zh 配置的分词行为（实测 don't / o'clock 保持单 token、
+操作符与首尾引号被剥离）；调整分词映射或 GUC 不仅需要 REINDEX，也会改变兜底转义的正确性，
+需重跑门控测试。
 """
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection

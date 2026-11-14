@@ -66,6 +66,7 @@ async def _vector_search(query_vector: list[float], kb_id: int | None, limit: in
 
     _require_context(kb_id, user_id, kb_ids)
     params: dict = {"qv": str(query_vector), "k": limit, "user_id": user_id}
+    # 与 FTS_PERMISSION 保持同步（审查备注：两份谓词仅靠评审对齐，演进时先合并）
     statement = """
         SELECT c.id AS chunk_id, c.file_id, c.chunk_index, c.page_no, c.content,
                f.kb_id, f.filename, f.file_type, f.created_at, f.version AS file_version,
@@ -103,6 +104,8 @@ FTS_PERMISSION = """
                 WHERE ur.user_id = :user_id AND rk.kb_id = f.kb_id))
 """
 
+_AND_TSQUERY = "plainto_tsquery('zh'::regconfig, :q)"
+
 
 async def _fts_search(query: str, kb_id: int | None, limit: int, *, user_id: int | None = None,
                       kb_ids: list[int] | None = None) -> list[Document]:
@@ -119,7 +122,7 @@ async def _fts_search(query: str, kb_id: int | None, limit: int, *, user_id: int
         JOIN files f ON f.id = c.file_id
         JOIN knowledge_bases kb ON kb.id = f.kb_id
         WHERE {FTS_PERMISSION}
-          AND to_tsvector('zh'::regconfig, c.content) @@ plainto_tsquery('zh'::regconfig, :q)
+          AND to_tsvector('zh'::regconfig, c.content) @@ {_AND_TSQUERY}
     """
     if kb_id:
         statement += " AND f.kb_id = :kb_id"
@@ -128,7 +131,7 @@ async def _fts_search(query: str, kb_id: int | None, limit: int, *, user_id: int
         statement += " AND f.kb_id = ANY(CAST(:kb_ids AS INTEGER[]))"
         params["kb_ids"] = kb_ids
     statement += (" ORDER BY ts_rank(to_tsvector('zh'::regconfig, c.content), "
-                  "plainto_tsquery('zh'::regconfig, :q)) DESC LIMIT :k")
+                  f"{_AND_TSQUERY}) DESC, c.id LIMIT :k")
 
     async with SessionLocal() as db:
         rows = (await db.execute(text(statement), params)).all()
@@ -145,7 +148,7 @@ async def _fts_search(query: str, kb_id: int | None, limit: int, *, user_id: int
         or_params.pop("q", None)
         or_params["or_query"] = " | ".join("'" + lex.replace("'", "''") + "'" for lex in lexemes)
         or_statement = statement.replace(
-            "plainto_tsquery('zh'::regconfig, :q)", "to_tsquery('zh'::regconfig, :or_query)")
+            _AND_TSQUERY, "to_tsquery('zh'::regconfig, :or_query)")
         rows = (await db.execute(text(or_statement), or_params)).all()
     return [_row_document(row) for row in rows]
 

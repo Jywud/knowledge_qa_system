@@ -53,6 +53,7 @@ async def test_db(monkeypatch):
                 (1, "企业知识库支持中文全文检索与权限过滤"),
                 (1, "向量检索与关键词检索通过RRF融合排序"),
                 (2, "机密的内部薪酬数据绝不能泄露"),
+                (1, "English corner 每晚 o'clock 准时开始"),
             ]:
                 file = FileRecord(kb_id=kb_id, filename=f"{kb_id}.md", file_type="md", uploaded_by=1)
                 db.add(file)
@@ -94,3 +95,8 @@ async def test_fts_chunk_keys_stay_stable(test_db):
     docs = await retrieval_service._fts_search("中文全文检索", None, 10, user_id=2, kb_ids=[1])
     keys = {(d.metadata["file_id"], d.metadata["chunk_index"]) for d in docs}
     assert len(keys) == len(docs) >= 1
+
+
+async def test_fts_or_fallback_handles_apostrophe_lexemes(test_db):
+    docs = await retrieval_service._fts_search("o'clock 薪酬报销", None, 5, user_id=2, kb_ids=[1])
+    assert docs and docs[0].metadata["kb_id"] == "1"
