@@ -170,9 +170,9 @@ def test_split_documents_keeps_md_heading_leading_its_section():
 def test_merge_small_chunks_falls_back_to_forward_when_backward_overflow():
     label = "章节"
     chunks = [
-        Document(page_content=f"{label}\n" + "甲" * 478, metadata={"path_label": label}),
-        Document(page_content=f"{label}\n尾", metadata={"path_label": label}),
-        Document(page_content=f"{label}\n" + "乙" * 98, metadata={"path_label": label}),
+        Document(page_content=f"{label}\n" + "甲" * 478, metadata={"path_label": label, "page": 3}),
+        Document(page_content=f"{label}\n尾", metadata={"path_label": label, "page": 3}),
+        Document(page_content=f"{label}\n" + "乙" * 98, metadata={"path_label": label, "page": 4}),
     ]
 
     merged = _merge_small_chunks(chunks, 400)
@@ -182,3 +182,5 @@ def test_merge_small_chunks_falls_back_to_forward_when_backward_overflow():
     assert merged[0].page_content == f"{label}\n" + "甲" * 478
     assert merged[1].page_content == f"{label}\n尾\n" + "乙" * 98
     assert merged[1].page_content.count(f"{label}\n") == 1
+    # 合并产物的用户可见页码取两侧较早的一页
+    assert merged[1].metadata["page"] == 3

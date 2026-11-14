@@ -132,6 +132,14 @@ def _strip_breadcrumb(chunk: Document) -> str:
     return chunk.page_content
 
 
+def _merged_metadata(primary: dict, absorbed: dict) -> dict:
+    # 合并产物覆盖两侧内容，用户可见页码取更早的一页
+    meta = dict(primary)
+    if meta.get("page") is not None and absorbed.get("page") is not None:
+        meta["page"] = min(meta["page"], absorbed["page"])
+    return meta
+
+
 def _merge_small_chunks(chunks: list[Document], chunk_size: int) -> list[Document]:
     """过短分块就近合并：先试并入前一个分块（同节、去重面包屑），放不下再试并入后一个分块。
 
@@ -158,7 +166,8 @@ def _merge_small_chunks(chunks: list[Document], chunk_size: int) -> list[Documen
             body = _strip_breadcrumb(chunk)
             if len(prev.page_content) + 1 + len(body) <= limit:
                 merged[-1] = Document(
-                    page_content=f"{prev.page_content}\n{body}", metadata=dict(prev.metadata)
+                    page_content=f"{prev.page_content}\n{body}",
+                    metadata=_merged_metadata(prev.metadata, chunk.metadata),
                 )
                 index += 1
                 continue
@@ -171,7 +180,10 @@ def _merge_small_chunks(chunks: list[Document], chunk_size: int) -> list[Documen
                 candidate = f"{chunk.page_content}\n{following.page_content}"
             if len(candidate) <= limit:
                 merged.append(
-                    Document(page_content=candidate, metadata=dict(following.metadata))
+                    Document(
+                        page_content=candidate,
+                        metadata=_merged_metadata(following.metadata, chunk.metadata),
+                    )
                 )
                 index += 2
                 continue
@@ -220,6 +232,7 @@ def _split_docx(blocks: list, chunk_size: int, chunk_overlap: int) -> list[Docum
             following = section_blocks[block_index + 1] if block_index + 1 < len(section_blocks) else None
             if (
                 kind == "paragraph"
+                and len(content) <= chunk_size
                 and content.rstrip().endswith(("：", ":"))
                 and following is not None
                 and following[0] == "table"
