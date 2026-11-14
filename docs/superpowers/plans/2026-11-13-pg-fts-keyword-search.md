@@ -381,6 +381,8 @@ async def test_fts_chunk_keys_stay_stable(test_db):
     assert len(keys) == len(docs) >= 1
 ```
 
+> 修正（实现排查）：fixture 全程使用隔离引擎（规避共享引擎跨事件循环 InterfaceError），并以 MetaData(schema=schema) 限定建表（规避 checkfirst 对 public 可见表的跳过）；种子数据按 FK 依赖分段 flush（users/roles → KBs → 授权关联，规避 UOW 对裸 FK 列无依赖排序导致的 ForeignKeyViolation）——见红灯提交。
+
 （fixture 内中文语料如与探针实测分词不符导致断言失败，调整语料字符串而非断言逻辑。）
 
 - [ ] **Step 3: 运行确认红灯**
