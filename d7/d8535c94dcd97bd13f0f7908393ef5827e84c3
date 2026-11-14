@@ -1,0 +1,38 @@
+docs/superpowers/specs/2026-11-14-sidebar-deepseek-redesign-design.md
+  c5b2d198176e636f 1-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "d7d8535c94dcd97bd13f0f7908393ef5827e84c3",
+  "prompts": {
+    "9e3049773ff067d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cc4f2a7c-b86b-4faa-ae25-a28aec57efc6",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 232,
+      "total_deletions": 1,
+      "accepted_lines": 689,
+      "overriden_lines": 1,
+      "messages_url": "https://git-ai.hsjdata.com/cas/c7097eec746b2378f9037f339429768f2e631d321d424a84e114c2d8f16143c3"
+    },
+    "c5b2d198176e636f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6df57e88-64f2-4dc1-9ac8-df27247e9c66",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 45,
+      "total_deletions": 0,
+      "accepted_lines": 45,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/25d76f18e9cdc433f5bcc4fa92dd7bb5cf99b0f71b2c606342b9d8ead06e7116"
+    }
+  }
+}
