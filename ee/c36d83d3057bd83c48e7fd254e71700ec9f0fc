@@ -1,0 +1,26 @@
+backend/app/services/document_service.py
+  fb2a5650aa5b728a 127-134,136,138-140,154,163-167
+backend/tests/test_docx_split.py
+  fb2a5650aa5b728a 121-141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "eec36d83d3057bd83c48e7fd254e71700ec9f0fc",
+  "prompts": {
+    "fb2a5650aa5b728a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3944cff8-c7ce-4a4b-81fa-e494f90e13a9",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 40,
+      "total_deletions": 7,
+      "accepted_lines": 127,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/a4b5bd967836ad86b4dc160520a027e03a7e8a6afbcbf6fc65c0b8988b8aea1b"
+    }
+  }
+}
