@@ -86,7 +86,7 @@ async def upload_file(
     filename = _safe_filename(file.filename)
     suffix = Path(filename).suffix.lstrip(".").lower()
     if suffix not in SUPPORTED_TYPES:
-        raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 md/docx/pdf/txt")
+        raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 md/docx/pdf/txt/pptx")
 
     record = FileRecord(
         kb_id=kb_id,
@@ -162,7 +162,7 @@ async def update_file(
     filename = _safe_filename(file.filename)
     suffix = Path(filename).suffix.lstrip(".").lower()
     if suffix not in SUPPORTED_TYPES:
-        raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 md/docx/pdf/txt")
+        raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 md/docx/pdf/txt/pptx")
 
     pending_dir = _upload_dir() / ".pending"
     pending_dir.mkdir(exist_ok=True)
