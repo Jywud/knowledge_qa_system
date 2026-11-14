@@ -1,0 +1,24 @@
+backend/app/routers/files.py
+  f6fb067149036380 89,165
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "f555b4fabd70ed54954013044eb7bef4a2c4de89",
+  "prompts": {
+    "f6fb067149036380": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "92f548be-6e35-4b67-b8e5-65d921ee924a",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 5,
+      "accepted_lines": 711,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/422ab4153eae89d058a3831cadb4b7bcdd65dcb6886fda1e7b43a098114af5a3"
+    }
+  }
+}
