@@ -1,0 +1,30 @@
+backend/app/services/retrieval_service.py
+  fb2a5650aa5b728a 1,4,10,99-104,107-109,113-132,134-150,153-158,163,165-171,173
+backend/tests/test_sources.py
+  fb2a5650aa5b728a 21-30,32
+backend/tests/test_retrieval_permissions.py
+  fb2a5650aa5b728a 6,18-28,31-41
+backend/tests/test_multi_kb_chat.py
+  fb2a5650aa5b728a 107,111-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "3e46cd42076bce4ba688eabe8736be5c1fd0d4a4",
+  "prompts": {
+    "fb2a5650aa5b728a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3944cff8-c7ce-4a4b-81fa-e494f90e13a9",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 107,
+      "total_deletions": 104,
+      "accepted_lines": 193,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/875bc2cb31af7301a8db5ff33b6f24440b4534021f5ab423bb23cb378ff5aa6f"
+    }
+  }
+}
