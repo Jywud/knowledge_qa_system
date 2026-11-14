@@ -1,0 +1,32 @@
+README.md
+  fb2a5650aa5b728a 71,108,223-224,241
+CLAUDE.md
+  fb2a5650aa5b728a 51,67-68
+docs/变更记录.md
+  fb2a5650aa5b728a 3-12
+docs/关键词检索优化设计.md
+  fb2a5650aa5b728a 3-4
+README.en.md
+  fb2a5650aa5b728a 71,107,222-223,240
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "dd8b462cf1e1b5151514fb739865e89ccf1ece9a",
+  "prompts": {
+    "fb2a5650aa5b728a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3944cff8-c7ce-4a4b-81fa-e494f90e13a9",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 33,
+      "total_deletions": 12,
+      "accepted_lines": 784,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/65c679c2f418007c5ba09a9da80d0a6dd5debfe2f7ff21f289276000b4bf29c0"
+    }
+  }
+}
