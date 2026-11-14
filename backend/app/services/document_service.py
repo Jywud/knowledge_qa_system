@@ -114,8 +114,9 @@ def _group_table_rows(block: str, chunk_size: int) -> list[str]:
     for row in table_rows:
         if current and current_size + len(row) > chunk_size:
             grouped.append("\n\n".join(current))
-            current = []
-            current_size = 0
+            # 从第二组起带上前一组的最后一行，跨组边界保留一行重叠上下文
+            current = [current[-1]]
+            current_size = len(current[0])
         current.append(row)
         current_size += len(row)
     if current:

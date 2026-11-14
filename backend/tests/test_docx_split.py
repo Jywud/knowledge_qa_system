@@ -97,3 +97,24 @@ def test_docx_split_attaches_lead_in_paragraph_to_table(tmp_path):
     content = chunks[0].page_content
     assert content.startswith("接口参数\n配置如下：\n\n配置项: 重试次数")
     assert "超时时间" in content
+
+
+def test_docx_split_overlaps_table_row_groups(tmp_path):
+    doc = DocxDocument()
+    doc.add_heading("参数表", level=1)
+    table = doc.add_table(rows=9, cols=2)
+    table.cell(0, 0).text = "名称"
+    table.cell(0, 1).text = "说明"
+    for i in range(1, 9):
+        table.cell(i, 0).text = f"参数{i:02d}"
+        table.cell(i, 1).text = "取值" * 25
+    path = tmp_path / "rows.docx"
+    doc.save(str(path))
+
+    chunks = _split_docx(_load_docx(path), 200, 20)
+
+    assert len(chunks) == 4
+    # 第二组以第一组最后一行开头（跨组重叠）
+    assert any(c.page_content.startswith("参数表\n名称: 参数03") for c in chunks)
+    assert sum("参数03" in c.page_content for c in chunks) == 2
+    assert sum("参数08" in c.page_content for c in chunks) == 1
