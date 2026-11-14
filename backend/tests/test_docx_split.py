@@ -118,3 +118,24 @@ def test_docx_split_overlaps_table_row_groups(tmp_path):
     assert any(c.page_content.startswith("参数表\n名称: 参数03") for c in chunks)
     assert sum("参数03" in c.page_content for c in chunks) == 2
     assert sum("参数08" in c.page_content for c in chunks) == 1
+
+
+def test_docx_split_forward_merge_keeps_single_breadcrumb(tmp_path):
+    doc = DocxDocument()
+    doc.add_heading("参数说明", level=1)
+    doc.add_paragraph("见下表。")
+    table = doc.add_table(rows=2, cols=2)
+    table.cell(0, 0).text = "配置项"
+    table.cell(0, 1).text = "值"
+    table.cell(1, 0).text = "重试次数"
+    table.cell(1, 1).text = "3"
+    path = tmp_path / "forward.docx"
+    doc.save(str(path))
+
+    chunks = _split_docx(_load_docx(path), 800, 100)
+
+    assert len(chunks) == 1
+    content = chunks[0].page_content
+    # 短段落与其后的表格同节，前向合并后面包屑只出现一次
+    assert content.count("参数说明\n") == 1
+    assert content.startswith("参数说明\n见下表。\n配置项: 重试次数")

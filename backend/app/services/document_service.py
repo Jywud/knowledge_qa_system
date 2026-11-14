@@ -124,11 +124,20 @@ def _group_table_rows(block: str, chunk_size: int) -> list[str]:
     return grouped
 
 
-def _merge_small_chunks(chunks: list[Document], chunk_size: int) -> list[Document]:
-    """过短分块就近合并：同节并入前一个分块（面包屑去重），跨节的小节起始块并入后一个分块。
+def _strip_breadcrumb(chunk: Document) -> str:
+    label = chunk.metadata.get("path_label") or ""
+    prefix = f"{label}\n" if label else ""
+    if prefix and chunk.page_content.startswith(prefix):
+        return chunk.page_content[len(prefix):]
+    return chunk.page_content
 
-    合并后总长不得超过 chunk_size 的 1.2 倍，两边都放不下则保留原样；
-    从前往后线性扫描，合并产生的较大块不再作为短块参与后续判断。
+
+def _merge_small_chunks(chunks: list[Document], chunk_size: int) -> list[Document]:
+    """过短分块就近合并：同节并入前一个分块，跨节的小节起始块并入后一个分块。
+
+    同节合并去掉重复的面包屑前缀（含前向合并时后块与短块同节的情形），
+    跨节合并保留各自前缀。合并后总长不得超过 chunk_size 的 1.2 倍，
+    两边都放不下则保留原样；从前往后线性扫描，合并产生的较大块不再作为短块参与后续判断。
     """
     limit = int(chunk_size * 1.2)
     merged: list[Document] = []
@@ -139,12 +148,10 @@ def _merge_small_chunks(chunks: list[Document], chunk_size: int) -> list[Documen
             merged.append(chunk)
             index += 1
             continue
-        label = chunk.metadata.get("path_label") or ""
-        prefix = f"{label}\n" if label else ""
-        body = chunk.page_content[len(prefix):] if prefix and chunk.page_content.startswith(prefix) else chunk.page_content
         same_section = bool(merged) and merged[-1].metadata.get("path_label") == chunk.metadata.get("path_label")
         if same_section:
             prev = merged[-1]
+            body = _strip_breadcrumb(chunk)
             if len(prev.page_content) + 1 + len(body) <= limit:
                 merged[-1] = Document(
                     page_content=f"{prev.page_content}\n{body}", metadata=dict(prev.metadata)
@@ -153,7 +160,11 @@ def _merge_small_chunks(chunks: list[Document], chunk_size: int) -> list[Documen
                 continue
         elif index + 1 < len(chunks):
             following = chunks[index + 1]
-            candidate = f"{chunk.page_content}\n{following.page_content}"
+            if following.metadata.get("path_label") == chunk.metadata.get("path_label"):
+                # 后块与短块同节：剥掉后块重复的面包屑，合并后前缀只出现一次
+                candidate = f"{chunk.page_content}\n{_strip_breadcrumb(following)}"
+            else:
+                candidate = f"{chunk.page_content}\n{following.page_content}"
             if len(candidate) <= limit:
                 merged.append(
                     Document(page_content=candidate, metadata=dict(following.metadata))
