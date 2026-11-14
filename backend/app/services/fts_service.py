@@ -2,13 +2,10 @@
 
 调整分词参数（下方 ALTER DATABASE 两项）或检索配置映射后，
 必须重建索引：REINDEX INDEX idx_chunks_content_fts，否则索引与查询的分词口径不一致。
+若库中已存在同名 `zh` 配置，将按现状使用，不校验其分词映射。
 """
-import logging
-
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection
-
-logger = logging.getLogger(__name__)
 
 FTS_CONFIG_NAME = "zh"
 FTS_INDEX_NAME = "idx_chunks_content_fts"
@@ -34,6 +31,8 @@ async def ensure_fts(conn: AsyncConnection) -> None:
         f"ALTER DATABASE {_sql_ident(db_name)} SET zhparser.punctuation_ignore = 'on'"))
     await conn.execute(text(
         f"ALTER DATABASE {_sql_ident(db_name)} SET zhparser.multi_short = 'on'"))
+    await conn.execute(text("SET zhparser.punctuation_ignore = 'on'"))
+    await conn.execute(text("SET zhparser.multi_short = 'on'"))
     await conn.execute(text(
         f"CREATE INDEX IF NOT EXISTS {FTS_INDEX_NAME} "
         "ON chunks USING GIN (to_tsvector('zh'::regconfig, content))"))

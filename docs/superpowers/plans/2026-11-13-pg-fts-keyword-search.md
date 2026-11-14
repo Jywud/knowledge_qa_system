@@ -179,6 +179,8 @@ async def ensure_fts(conn: AsyncConnection) -> None:
         ))
 ```
 
+> 修正（质量审查）：ensure_fts 以 begin_nested() 存档点隔离失败；ensure_fts 内在 ALTER DATABASE 后补会话级 SET 对齐 GUC——见修复提交。
+
 - [ ] **Step 3: compose db 服务换镜像**
 
 `docker-compose.yml` 的 db 服务开头改为（其余字段不动）：

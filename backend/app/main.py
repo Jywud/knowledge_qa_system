@@ -43,7 +43,8 @@ async def _initialize_database() -> None:
         await conn.run_sync(Base.metadata.create_all)
         try:
             from app.services.fts_service import ensure_fts
-            await ensure_fts(conn)
+            async with conn.begin_nested():
+                await ensure_fts(conn)
         except Exception:
             logger.exception("zhparser 全文检索初始化失败，关键词检索将降级为纯向量结果；"
                              "生产部署请使用自建 PostgreSQL 镜像（backend/docker/Dockerfile.pgvector）")
