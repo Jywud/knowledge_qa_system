@@ -1,0 +1,25 @@
+backend/app/services/document_service.py
+  f6fb067149036380 10,24,110-139,344-345
+backend/requirements.txt
+  f6fb067149036380 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "6dcda7b789a8dafc269bb295c72ae52e8ebb8bb5",
+  "prompts": {
+    "f6fb067149036380": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "92f548be-6e35-4b67-b8e5-65d921ee924a",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": null,
+      "messages": [],
+      "total_additions": 192,
+      "total_deletions": 550,
+      "accepted_lines": 770,
+      "overriden_lines": 0
+    }
+  }
+}
