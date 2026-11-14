@@ -1,0 +1,84 @@
+backend/app/main.py
+  9e3049773ff067d1 71,73-81
+CLAUDE.md
+  9e3049773ff067d1 51,59
+backend/tests/test_multi_kb_chat.py
+  9e3049773ff067d1 114-115
+backend/app/services/retrieval_service.py
+  9e3049773ff067d1 8,65,90,157-161,165,168-169,176,180-196
+backend/app/models.py
+  9e3049773ff067d1 4,121-125
+backend/requirements.txt
+  9e3049773ff067d1 7
+backend/app/services/settings_service.py
+  9e3049773ff067d1 17-19
+frontend/src/components/AppLayout.vue
+  9e3049773ff067d1 10,43
+README.en.md
+  9e3049773ff067d1 5,9,57,69,71-75,77,79,81,91,93,102,109-110,130,136-137,139-140,143,168,188,193-199,202-203,209,211,225,243,253,265,269
+backend/tests/test_rerank.py
+  9e3049773ff067d1 1-112
+backend/.env.example
+  9e3049773ff067d1 1-2,4,6-8,10,12-18,20,22,24,26,28-30,32,35-36,38,41,43-54,56,58,60-62,64,66,68
+backend/tests/test_min_score.py
+  9e3049773ff067d1 1-54
+backend/app/schemas.py
+  9e3049773ff067d1 152-155,164-167
+backend/app/services/rerank_service.py
+  9e3049773ff067d1 1-38
+backend/app/config.py
+  9e3049773ff067d1 15-17,32-36
+backend/tests/test_settings.py
+  9e3049773ff067d1 1-39
+README.md
+  9e3049773ff067d1 5,9,57,69,71-72,74-76,78,82,92,94,110-111,131,137,140-141,144-145,169,189,194-200,203-204,210,212,222,226,244,254,264,268
+docker-compose.yml
+  9e3049773ff067d1 31-34,43-46
+backend/app/routers/chat.py
+  9e3049773ff067d1 155-158,183-185
+frontend/src/store.js
+  9e3049773ff067d1 27-33
+.gitignore
+  9e3049773ff067d1 16
+backend/app/routers/settings.py
+  9e3049773ff067d1 35-42,48-51
+backend/app/services/rag_service.py
+  9e3049773ff067d1 48-51,141-142,144-145
+frontend/src/views/SystemSettings.vue
+  9e3049773ff067d1 7,17-22,38-45,50-51,71,89,91-114,158-161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "767737d3b71bdb21c58358c5afd3e489271e5d24",
+  "prompts": {
+    "9e3049773ff067d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cc4f2a7c-b86b-4faa-ae25-a28aec57efc6",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 1531,
+      "total_deletions": 3316,
+      "accepted_lines": 1649,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/a17986b7b7d45bf82b7fe29cb7fa100fc83212efb7de9dfa215b0be95518a38e"
+    },
+    "f6fb067149036380": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "92f548be-6e35-4b67-b8e5-65d921ee924a",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 894,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/bf5982c91dc04f8c9fe921b90726abde33797e6af96ca0ec8cb2e6a9dd024c44"
+    }
+  }
+}
