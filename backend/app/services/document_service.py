@@ -133,9 +133,9 @@ def _strip_breadcrumb(chunk: Document) -> str:
 
 
 def _merge_small_chunks(chunks: list[Document], chunk_size: int) -> list[Document]:
-    """过短分块就近合并：同节并入前一个分块，跨节的小节起始块并入后一个分块。
+    """过短分块就近合并：先试并入前一个分块（同节、去重面包屑），放不下再试并入后一个分块。
 
-    同节合并去掉重复的面包屑前缀（含前向合并时后块与短块同节的情形），
+    通用路径以 '#' 开头的 markdown 标题块只并入后块，避免标题被埋进上一节尾部；
     跨节合并保留各自前缀。合并后总长不得超过 chunk_size 的 1.2 倍，
     两边都放不下则保留原样；从前往后线性扫描，合并产生的较大块不再作为短块参与后续判断。
     """
@@ -148,8 +148,12 @@ def _merge_small_chunks(chunks: list[Document], chunk_size: int) -> list[Documen
             merged.append(chunk)
             index += 1
             continue
-        same_section = bool(merged) and merged[-1].metadata.get("path_label") == chunk.metadata.get("path_label")
-        if same_section:
+        heading_block = chunk.metadata.get("path_label") is None and chunk.page_content.startswith("#")
+        if (
+            merged
+            and not heading_block
+            and merged[-1].metadata.get("path_label") == chunk.metadata.get("path_label")
+        ):
             prev = merged[-1]
             body = _strip_breadcrumb(chunk)
             if len(prev.page_content) + 1 + len(body) <= limit:
@@ -158,7 +162,7 @@ def _merge_small_chunks(chunks: list[Document], chunk_size: int) -> list[Documen
                 )
                 index += 1
                 continue
-        elif index + 1 < len(chunks):
+        if index + 1 < len(chunks):
             following = chunks[index + 1]
             if following.metadata.get("path_label") == chunk.metadata.get("path_label"):
                 # 后块与短块同节：剥掉后块重复的面包屑，合并后前缀只出现一次

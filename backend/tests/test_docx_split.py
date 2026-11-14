@@ -1,6 +1,12 @@
 from docx import Document as DocxDocument
+from langchain_core.documents import Document
 
-from app.services.document_service import _load_docx, _split_docx
+from app.services.document_service import (
+    _load_docx,
+    _merge_small_chunks,
+    _split_docx,
+    _split_documents,
+)
 
 
 def _build_docx(tmp_path):
@@ -139,3 +145,40 @@ def test_docx_split_forward_merge_keeps_single_breadcrumb(tmp_path):
     # 短段落与其后的表格同节，前向合并后面包屑只出现一次
     assert content.count("参数说明\n") == 1
     assert content.startswith("参数说明\n见下表。\n配置项: 重试次数")
+
+
+def test_split_documents_keeps_md_heading_leading_its_section():
+    md = "\n\n".join(
+        [
+            "# 总览",
+            "总览内容。" * 30,
+            "## 第一节",
+            "第一节点内容。" * 30,
+            "## 第二节",
+            "第二节内容。" * 30,
+        ]
+    )
+
+    chunks = _split_documents([Document(page_content=md)], 400, 50)
+
+    # markdown 标题领起自己小节的分块，不被并入上一节尾部
+    assert any(c.page_content.startswith("# 总览\n") for c in chunks)
+    assert any(c.page_content.startswith("## 第一节\n") for c in chunks)
+    assert any(c.page_content.startswith("## 第二节\n") for c in chunks)
+
+
+def test_merge_small_chunks_falls_back_to_forward_when_backward_overflow():
+    label = "章节"
+    chunks = [
+        Document(page_content=f"{label}\n" + "甲" * 478, metadata={"path_label": label}),
+        Document(page_content=f"{label}\n尾", metadata={"path_label": label}),
+        Document(page_content=f"{label}\n" + "乙" * 98, metadata={"path_label": label}),
+    ]
+
+    merged = _merge_small_chunks(chunks, 400)
+
+    # 前块已接近 1.2 倍上限放不下 → 兜底并入后块，面包屑仍只出现一次
+    assert len(merged) == 2
+    assert merged[0].page_content == f"{label}\n" + "甲" * 478
+    assert merged[1].page_content == f"{label}\n尾\n" + "乙" * 98
+    assert merged[1].page_content.count(f"{label}\n") == 1
