@@ -1,0 +1,24 @@
+frontend/src/views/FileManager.vue
+  f6fb067149036380 155,215,251
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "53d8ed4d2e5f138386e9738873751de3b43b6495",
+  "prompts": {
+    "f6fb067149036380": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "92f548be-6e35-4b67-b8e5-65d921ee924a",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 360,
+      "total_deletions": 3,
+      "accepted_lines": 357,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/4e1b84aee2b1bf31841428b6dfe69e0fd46636cbf7c2bf6a1798bfe0678ce42c"
+    }
+  }
+}
