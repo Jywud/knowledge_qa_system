@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock
 from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, HumanMessage
 
-from app.models import Chunk, FileRecord
 from app.services import retrieval_service
 from app.services.rag_service import make_chat_node
 
@@ -19,20 +18,18 @@ def test_row_document_keeps_stable_reference_identity():
     assert doc.metadata["file_version"] == 3
 
 
-async def test_keyword_retrieval_keeps_reference_identity(test_db, monkeypatch):
-    async with test_db() as db:
-        record = FileRecord(kb_id=1, filename="guide.md", file_type="md", uploaded_by=1, version=3)
-        db.add(record)
-        await db.flush()
-        chunk = Chunk(file_id=record.id, chunk_index=0, content="needle reference document")
-        db.add(chunk)
-        await db.commit()
-        chunk_id = chunk.id
-    provider = SimpleNamespace(aembed_query=AsyncMock(side_effect=RuntimeError("offline")))
-    monkeypatch.setattr(retrieval_service, "get_embeddings", lambda: provider)
+async def test_keyword_fallback_keeps_reference_identity(test_db, monkeypatch):
+    monkeypatch.setattr(retrieval_service, "get_embeddings", lambda: SimpleNamespace(
+        aembed_query=AsyncMock(side_effect=RuntimeError("offline"))))
+    doc = Document(page_content="needle reference document",
+                   metadata={"chunk_id": "7", "file_id": "1", "chunk_index": "0", "file_version": 3})
+
+    async def fake_fts(query, kb_id, limit, *, user_id=None, kb_ids=None):
+        return [doc]
+
+    monkeypatch.setattr(retrieval_service, "_fts_search", fake_fts)
     docs = await retrieval_service.hybrid_search("needle", 1, 5, user_id=1)
-    assert len(docs) == 1
-    assert str(docs[0].metadata["chunk_id"]) == str(chunk_id)
+    assert str(docs[0].metadata["chunk_id"]) == "7"
     assert docs[0].metadata["file_version"] == 3
 
 

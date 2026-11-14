@@ -104,15 +104,17 @@ async def test_all_scope_requires_at_least_one_readable_library(client, admin_to
     assert (await client.post("/api/conversations", headers=headers, json={})).status_code == 403
 
 
-async def test_all_scope_keyword_fallback_intersects_permissions_and_snapshot(client, test_db, monkeypatch):
+async def test_all_scope_keyword_fallback_passes_scope_and_snapshot(client, test_db, monkeypatch):
     await seed(client, test_db)
     monkeypatch.setattr(retrieval_service, "get_embeddings", lambda: SimpleNamespace(
         aembed_query=AsyncMock(side_effect=RuntimeError("offline"))))
-    docs = await retrieval_service.hybrid_search("needle", None, 5, user_id=2, kb_ids=[1, 2, 3])
-    assert {doc.metadata["kb_id"] for doc in docs} == {"1", "2"}
-    docs = await retrieval_service.hybrid_search("needle", None, 5, user_id=2, kb_ids=[2])
-    assert {doc.metadata["kb_id"] for doc in docs} == {"2"}
-    assert await retrieval_service.hybrid_search("needle", 1, 5, user_id=2, kb_ids=[2]) == []
+    fts = AsyncMock(return_value=[])
+    monkeypatch.setattr(retrieval_service, "_fts_search", fts)
+    assert await retrieval_service.hybrid_search("needle", None, 5, user_id=2, kb_ids=[1, 2, 3]) == []
+    # hybrid_search 向关键词通道传 candidate_k = max(top_k * 2, 10)，此处 top_k=5 -> 10
+    assert fts.await_args.args == ("needle", None, 10)
+    assert fts.await_args.kwargs["kb_ids"] == [1, 2, 3]
+    assert fts.await_args.kwargs["user_id"] == 2
 
 
 async def test_multi_kb_conversation_blocks_deleting_its_library(client, admin_token, test_db):

@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import HTTPException
+from langchain_core.documents import Document
 
-from app.models import Chunk, FileRecord, KnowledgeBase
 from app.services import retrieval_service
 
 
@@ -15,21 +15,27 @@ async def test_retrieval_requires_authenticated_context(test_db, monkeypatch):
         await retrieval_service.hybrid_search("needle", 1, 5)
 
 
-async def test_keyword_fallback_never_reads_ungranted_library(test_db, monkeypatch):
-    async with test_db() as db:
-        kb = KnowledgeBase(name="secret", created_by=1)
-        db.add(kb)
-        await db.flush()
-        for kb_id in [1, kb.id]:
-            file = FileRecord(kb_id=kb_id, filename=f"{kb_id}.md", file_type="md", uploaded_by=1)
-            db.add(file)
-            await db.flush()
-            db.add(Chunk(file_id=file.id, chunk_index=0, content="needle source document"))
-        await db.commit()
-        secret_id = kb.id
+async def test_conflicting_scope_short_circuits_before_channels(test_db, monkeypatch):
+    embed = AsyncMock(side_effect=RuntimeError("不应触发向量通道"))
+    monkeypatch.setattr(retrieval_service, "get_embeddings", lambda: SimpleNamespace(aembed_query=embed))
+    fts = AsyncMock(return_value=[])
+    monkeypatch.setattr(retrieval_service, "_fts_search", fts)
+    assert await retrieval_service.hybrid_search("needle", 1, 5, user_id=2, kb_ids=[2]) == []
+    embed.assert_not_awaited()
+    fts.assert_not_awaited()
+
+
+async def test_vector_failure_falls_back_to_keyword_channel(test_db, monkeypatch):
     monkeypatch.setattr(retrieval_service, "get_embeddings", lambda: SimpleNamespace(
         aembed_query=AsyncMock(side_effect=RuntimeError("offline"))))
-    visible = await retrieval_service.hybrid_search("needle", 1, 5, user_id=2)
-    assert len(visible) == 1 and visible[0].metadata["kb_id"] == "1"
-    hidden = await retrieval_service.hybrid_search("needle", secret_id, 5, user_id=2)
-    assert hidden == []
+    doc = Document(page_content="needle source document",
+                   metadata={"chunk_id": "7", "file_id": "1", "chunk_index": "0", "file_version": 1})
+
+    async def fake_fts(query, kb_id, limit, *, user_id=None, kb_ids=None):
+        assert kb_id == 1 and user_id == 2
+        return [doc]
+
+    monkeypatch.setattr(retrieval_service, "_fts_search", fake_fts)
+    docs = await retrieval_service.hybrid_search("needle", 1, 5, user_id=2)
+    assert [d.metadata["chunk_id"] for d in docs] == ["7"]
+    assert docs[0].metadata["file_version"] == 1

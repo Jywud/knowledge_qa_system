@@ -1,21 +1,13 @@
-import re
+import logging
 
-from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
-from sqlalchemy import select, text
+from sqlalchemy import text
 from fastapi import HTTPException
 
-from app.models import Chunk, FileRecord, KnowledgeBase
 from app.services.document_service import get_embeddings
 from app.config import settings
-from app.services.permission_service import readable_kb_predicate
 
-CHINESE_STOP_CHARS = set("的了在是我有和就不人都一为大上个子中会说要到你们会着没好给这那也时等与及或对其把被让从向而并但因此于由之一二三四五六七八九十什么吗呢吧啊哪些")
-
-
-def tokenize_for_search(text: str) -> list[str]:
-    tokens = re.findall(r"[a-z0-9_]+|[\u4e00-\u9fff]", text.lower())
-    return [token for token in tokens if token not in CHINESE_STOP_CHARS]
+logger = logging.getLogger(__name__)
 
 
 def _row_document(row) -> Document:
@@ -104,73 +96,79 @@ async def _vector_search(query_vector: list[float], kb_id: int | None, limit: in
     return [_row_document(row) for row in rows]
 
 
-def _bm25_search(query: str, rows: list, limit: int) -> list[Document]:
-    documents = [_row_document(row) for row in rows]
-    if not documents:
-        return []
+FTS_PERMISSION = """
+    (EXISTS (SELECT 1 FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+             WHERE ur.user_id = :user_id AND r.system_key = 'system_admin')
+     OR EXISTS (SELECT 1 FROM user_roles ur JOIN role_knowledge_bases rk ON rk.role_id = ur.role_id
+                WHERE ur.user_id = :user_id AND rk.kb_id = f.kb_id))
+"""
 
-    retriever = BM25Retriever.from_documents(
-        documents,
-        preprocess_func=tokenize_for_search,
-        k=limit,
-    )
-    query_tokens = tokenize_for_search(query)
-    query_set = set(query_tokens)
-    cjk_count = sum(1 for token in query_tokens if not token.isascii())
-    required_overlap = min(3, cjk_count) if cjk_count else 1
-    results = []
-    for document in retriever.invoke(query):
-        document_tokens = set(tokenize_for_search(document.page_content))
-        if len(query_set & document_tokens) >= required_overlap:
-            results.append(document)
-    return results
+
+async def _fts_search(query: str, kb_id: int | None, limit: int, *, user_id: int | None = None,
+                      kb_ids: list[int] | None = None) -> list[Document]:
+    """zhparser 词级全文检索；AND 零命中时以分词 OR 组合兜底并按 ts_rank 排序。"""
+    from app.database import SessionLocal
+
+    _require_context(kb_id, user_id, kb_ids)
+    params: dict = {"user_id": user_id, "k": limit, "q": query}
+    statement = f"""
+        SELECT c.id AS chunk_id, c.file_id, c.chunk_index, c.page_no, c.content,
+               f.kb_id, f.filename, f.file_type, f.created_at, f.version AS file_version,
+               kb.name AS kb_name
+        FROM chunks c
+        JOIN files f ON f.id = c.file_id
+        JOIN knowledge_bases kb ON kb.id = f.kb_id
+        WHERE {FTS_PERMISSION}
+          AND to_tsvector('zh'::regconfig, c.content) @@ plainto_tsquery('zh'::regconfig, :q)
+    """
+    if kb_id:
+        statement += " AND f.kb_id = :kb_id"
+        params["kb_id"] = kb_id
+    if kb_ids is not None:
+        statement += " AND f.kb_id = ANY(CAST(:kb_ids AS INTEGER[]))"
+        params["kb_ids"] = kb_ids
+    statement += (" ORDER BY ts_rank(to_tsvector('zh'::regconfig, c.content), "
+                  "plainto_tsquery('zh'::regconfig, :q)) DESC LIMIT :k")
+
+    async with SessionLocal() as db:
+        rows = (await db.execute(text(statement), params)).all()
+        if rows:
+            return [_row_document(row) for row in rows]
+
+        # AND 零命中：用 zhparser 自身分词结果构造 OR 查询；词面加引号防 tsquery 操作符注入
+        lexemes = (await db.execute(text(
+            "SELECT DISTINCT lexeme FROM unnest(to_tsvector('zh'::regconfig, :q)) "
+            "ORDER BY lexeme"), {"q": query})).scalars().all()
+        if not lexemes:
+            return []
+        or_params = dict(params)
+        or_params.pop("q", None)
+        or_params["or_query"] = " | ".join("'" + lex.replace("'", "''") + "'" for lex in lexemes)
+        or_statement = statement.replace(
+            "plainto_tsquery('zh'::regconfig, :q)", "to_tsquery('zh'::regconfig, :or_query)")
+        rows = (await db.execute(text(or_statement), or_params)).all()
+    return [_row_document(row) for row in rows]
 
 
 async def hybrid_search(query: str, kb_id: int | None, top_k: int, *, user_id: int | None = None,
                         kb_ids: list[int] | None = None) -> list[Document]:
-    from app.database import SessionLocal
-
     _require_context(kb_id, user_id, kb_ids)
-    candidate_k = max(top_k * 2, 10)
-    async with SessionLocal() as db:
-        sql_statement = (
-            select(
-                Chunk.id.label("chunk_id"),
-                Chunk.file_id,
-                Chunk.chunk_index,
-                Chunk.page_no,
-                Chunk.content,
-                FileRecord.kb_id,
-                FileRecord.filename,
-                FileRecord.file_type,
-                FileRecord.created_at,
-                FileRecord.version.label("file_version"),
-                KnowledgeBase.name.label("kb_name"),
-            )
-            .join(FileRecord, FileRecord.id == Chunk.file_id)
-            .join(KnowledgeBase, KnowledgeBase.id == FileRecord.kb_id)
-            .order_by(Chunk.id)
-            .where(readable_kb_predicate(FileRecord.kb_id, user_id))
-        )
-        if kb_id:
-            sql_statement = sql_statement.where(FileRecord.kb_id == kb_id)
-        if kb_ids is not None:
-            sql_statement = sql_statement.where(FileRecord.kb_id.in_(kb_ids))
-        result = await db.execute(sql_statement)
-        rows = result.all()
-
-    if not rows:
+    if kb_id is not None and kb_ids is not None and kb_id not in kb_ids:
         return []
-
+    candidate_k = max(top_k * 2, 10)
     try:
         query_vector = await get_embeddings().aembed_query(query)
         vector_docs = await _vector_search(query_vector, kb_id, candidate_k, user_id=user_id, kb_ids=kb_ids)
     except Exception:
+        logger.exception("向量检索失败，降级为纯关键词结果")
         vector_docs = None
+    if vector_docs is not None and not vector_docs:
+        return []  # 保守行为保持：向量零命中直接返回空，不引入关键词噪声
+    try:
+        keyword_docs = await _fts_search(query, kb_id, candidate_k, user_id=user_id, kb_ids=kb_ids)
+    except Exception:
+        logger.exception("关键词检索失败，降级为纯向量结果")
+        keyword_docs = []
     if vector_docs is None:
-        return _bm25_search(query, rows, top_k)
-    if not vector_docs:
-        return []
-
-    keyword_docs = _bm25_search(query, rows, candidate_k)
+        return keyword_docs[:top_k]
     return _merge_candidates(vector_docs, keyword_docs, top_k)
