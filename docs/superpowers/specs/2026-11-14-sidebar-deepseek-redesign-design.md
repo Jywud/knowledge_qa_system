@@ -27,7 +27,9 @@
 
 - `sidebarCollapsed` ref 放 `store.js`，持久化到 `localStorage`（key `kqa_sidebar_collapsed`），刷新不丢
 - 展开时：侧边栏右上角按钮触发折叠
-- 折叠后：侧边栏整体隐藏（`el-aside` 不渲染），聊天区占满；顶栏左侧（`header-left`，chat 页原本为空）出现展开按钮
+- 展开/收起带宽度过渡动画（`el-aside` 220px ↔ 0px，0.28s ease）；侧边栏内容固定 220px 宽，动画期间仅被裁切不压缩
+- 折叠后：侧边栏整体隐藏，聊天区占满；顶栏左侧（`header-left`）展示「logo + 系统名 + 展开按钮」，与非 chat 页的 header-brand 同款，点击回首页
+- 展开态下侧边栏内系统名完整展示（品牌行收紧内边距与间距，不截断）
 
 ### 明确不做
 
