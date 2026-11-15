@@ -1,0 +1,24 @@
+docs/superpowers/specs/2026-11-14-sidebar-deepseek-redesign-design.md
+  c5b2d198176e636f 30-32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "1339327a944cb54fed118d3eca1a0b4186f6d96d",
+  "prompts": {
+    "c5b2d198176e636f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6df57e88-64f2-4dc1-9ac8-df27247e9c66",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 786,
+      "total_deletions": 54,
+      "accepted_lines": 264,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/a3ea9e7294093927434dab6356ba60069e0ef0e79b5fe7cf4b7a758abb77ad7c"
+    }
+  }
+}
