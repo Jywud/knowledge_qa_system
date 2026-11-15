@@ -33,6 +33,14 @@ export async function ensureUser() {
 
 export const conversations = ref([]);
 
+// 侧边栏折叠属 UI 偏好：持久化到 localStorage，登出不消除。
+const SIDEBAR_COLLAPSED_KEY = "kqa_sidebar_collapsed";
+export const sidebarCollapsed = ref(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
+export function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value;
+  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed.value ? "1" : "0");
+}
+
 export const currentConversationId = ref(null);
 
 export const selectedKb = ref(null);

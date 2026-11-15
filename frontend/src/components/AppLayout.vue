@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 import { ElMessage } from "element-plus";
-import { Collection, Lock, Setting, SwitchButton, User } from "@element-plus/icons-vue";
+import { ChatDotRound, Collection, Expand, Lock, Setting, SwitchButton, User } from "@element-plus/icons-vue";
 import { useRouter } from "vue-router";
 import AppSidebar from "./AppSidebar.vue";
 import { newPasswordRules } from "../utils/validation";
@@ -14,6 +14,8 @@ import {
   loadConversations,
   loadKnowledgeBases,
   clearAuth,
+  sidebarCollapsed,
+  toggleSidebar,
 } from "../store";
 
 const router = useRouter();
@@ -93,13 +95,13 @@ async function changePassword() {
 
 <template>
   <el-container class="layout">
-    <el-aside v-if="isChat" width="220px">
+    <el-aside v-if="isChat" class="chat-aside" :width="sidebarCollapsed ? '0px' : '220px'">
       <AppSidebar />
     </el-aside>
     <el-container>
       <el-header class="header">
         <div class="header-left">
-          <button v-if="!isChat" class="header-brand" @click="router.push('/home')">
+          <button v-if="!isChat || sidebarCollapsed" class="header-brand" @click="router.push('/home')">
             <span class="brand-mark" aria-hidden="true">
               <svg viewBox="0 0 32 32" width="14" height="14" fill="none">
                 <path d="M16 3.5 27 9.75v12.5L16 28.5 5 22.25V9.75L16 3.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
@@ -107,6 +109,14 @@ async function changePassword() {
               </svg>
             </span>
             <span>企业智能知识库系统</span>
+          </button>
+          <button
+            v-if="isChat && sidebarCollapsed"
+            class="sidebar-expand"
+            title="展开侧边栏"
+            @click="toggleSidebar"
+          >
+            <el-icon :size="18"><Expand /></el-icon>
           </button>
         </div>
         <div class="header-actions">
@@ -118,6 +128,7 @@ async function changePassword() {
             </span>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item :icon="ChatDotRound" command="chat">对话</el-dropdown-item>
                 <el-dropdown-item :icon="Lock" command="change-password">修改密码</el-dropdown-item>
                 <el-dropdown-item v-if="user.is_admin" :icon="User" command="users">用户管理</el-dropdown-item>
                 <el-dropdown-item v-if="user.is_admin" :icon="User" command="roles">角色管理</el-dropdown-item>
@@ -158,6 +169,12 @@ async function changePassword() {
   height: 100vh;
 }
 
+/* 收起动画：宽度过渡，内容由 AppSidebar 固定 220px 宽，仅被裁切不压缩 */
+.chat-aside {
+  overflow: hidden;
+  transition: width 0.28s ease;
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -172,6 +189,24 @@ async function changePassword() {
   display: flex;
   align-items: center;
   min-width: 0;
+}
+
+.sidebar-expand {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.sidebar-expand:hover {
+  background: var(--color-surface-muted);
 }
 
 .header-brand {
