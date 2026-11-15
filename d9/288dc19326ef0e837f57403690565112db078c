@@ -1,0 +1,43 @@
+frontend/src/store.js
+  c5b2d198176e636f 36-43
+frontend/src/components/AppSidebar.vue
+  c5b2d198176e636f 2,5-6,10-32,62-82,84,90-94,96-98,104-106,110,116-131,134,136-161,164,167-180,183-185,190-196,203-204,209
+frontend/src/components/AppLayout.vue
+  c5b2d198176e636f 4,17-18,98,104,113-120,172-177,194-211
+  9e3049773ff067d1 131
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "d9288dc19326ef0e837f57403690565112db078c",
+  "prompts": {
+    "9e3049773ff067d1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cc4f2a7c-b86b-4faa-ae25-a28aec57efc6",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 686,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/c7097eec746b2378f9037f339429768f2e631d321d424a84e114c2d8f16143c3"
+    },
+    "c5b2d198176e636f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6df57e88-64f2-4dc1-9ac8-df27247e9c66",
+        "model": "glm-5-3-flash"
+      },
+      "human_author": "dayu",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 320,
+      "overriden_lines": 0,
+      "messages_url": "https://git-ai.hsjdata.com/cas/e57d4779769babaf3862a0e2f10f02047d16459e793a71b115b043ce26e85c0a"
+    }
+  }
+}
