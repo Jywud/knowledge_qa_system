@@ -109,6 +109,7 @@ class FileOut(BaseModel):
     version: int
     status: str
     status_message: str = ""
+    retryable: bool = False
     chunk_count: int = 0
     uploader: str = ""
     created_at: datetime

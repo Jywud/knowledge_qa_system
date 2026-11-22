@@ -63,7 +63,10 @@ async def _initialize_database() -> None:
             await conn.execute(models.SchemaMigration.__table__.insert().values(version=MIGRATION_VERSION))
             await conn.execute(models.SchemaMigration.__table__.insert().values(version=SCOPE_VERSION))
         await conn.execute(text(
-            "UPDATE files SET status='failed', status_message='服务重启导致处理中断，请重新上传' "
+            "UPDATE files SET status='failed', status_message=CASE "
+            "WHEN version=1 AND NOT EXISTS (SELECT 1 FROM chunks WHERE chunks.file_id=files.id) "
+            "THEN '服务重启导致入库中断，可点击重试' "
+            "ELSE '服务重启导致处理中断，请重新上传' END "
             "WHERE status='processing'"
         ))
         await conn.execute(text(

@@ -11,6 +11,9 @@ const files = ref([]);
 const uploadRef = ref(null);
 let pendingUploads = 0;
 let pollTimer = null;
+let fileListVersion = 0;
+let active = true;
+const retryingIds = ref(new Set());
 const selectedKb = ref(null);
 const chunkDialog = ref(false);
 const chunks = ref([]);
@@ -36,30 +39,29 @@ async function init() {
 }
 
 async function loadFiles() {
-  if (!selectedKb.value) {
-    files.value = [];
-    return;
-  }
-  const res = await api.get("/files", { params: { kb_id: selectedKb.value } });
-  files.value = res.data;
+  const kbId = selectedKb.value;
+  const version = fileListVersion;
+  const rows = kbId ? (await api.get("/files", { params: { kb_id: kbId } })).data : [];
+  if (!active || kbId !== selectedKb.value || version !== fileListVersion) return;
+  files.value = rows;
   schedulePolling();
 }
 
 function schedulePolling() {
   const processing = files.value.some((f) => f.status === "processing");
   if (processing && !pollTimer) {
-    pollTimer = setInterval(async () => {
-      const res = await api.get("/files", { params: { kb_id: selectedKb.value } });
-      files.value = res.data;
-      if (!files.value.some((f) => f.status === "processing")) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
+    pollTimer = setInterval(() => {
+      // 重启期间请求可能失败，下一轮继续查询。
+      loadFiles().catch(() => {});
     }, 3000);
+  } else if (!processing && pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
   }
 }
 
 onUnmounted(() => {
+  active = false;
   if (pollTimer) clearInterval(pollTimer);
 });
 
@@ -89,6 +91,24 @@ async function updateFile({ file }, row) {
     loadFiles();
   } catch (e) {
     ElMessage.error(e.response?.data?.detail || "更新失败");
+  }
+}
+
+async function retryFile(row) {
+  if (retryingIds.value.has(row.id)) return;
+  retryingIds.value.add(row.id);
+  try {
+    const { data } = await api.post(`/files/${row.id}/retry`);
+    if (active && selectedKb.value === row.kb_id) {
+      fileListVersion++;
+      files.value = files.value.map((file) => file.id === row.id ? data : file);
+      schedulePolling();
+    }
+    ElMessage.success("已提交重试，正在后台解析");
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || "重试失败");
+  } finally {
+    retryingIds.value.delete(row.id);
   }
 }
 
@@ -159,7 +179,7 @@ const STATUS_META = {
       </template>
       <el-alert
         v-else
-        :title="isAdmin ? '请先选择知识库' : '仅管理员可上传 / 更新 / 删除文件'"
+        :title="isAdmin ? '请先选择知识库' : '仅管理员可上传 / 重试 / 更新 / 删除文件'"
         type="info"
         :closable="false"
         show-icon
@@ -197,7 +217,7 @@ const STATUS_META = {
         <el-table-column prop="created_at" label="上传时间" width="170">
           <template #default="{ row }">{{ new Date(row.created_at).toLocaleString() }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" :width="isAdmin ? 270 : 220" fixed="right">
           <template #default="{ row }">
             <el-button
               link
@@ -207,6 +227,15 @@ const STATUS_META = {
               @click="viewChunks(row)"
             >
               分块
+            </el-button>
+            <el-button
+              v-if="isAdmin && row.retryable"
+              link
+              type="primary"
+              :loading="retryingIds.has(row.id)"
+              @click="retryFile(row)"
+            >
+              重试
             </el-button>
             <el-upload
               v-if="isAdmin"
@@ -219,7 +248,7 @@ const STATUS_META = {
                 link
                 type="primary"
                 :icon="RefreshRight"
-                :disabled="row.status === 'processing'"
+                :disabled="row.status === 'processing' || retryingIds.has(row.id)"
               >
                 更新
               </el-button>
@@ -229,7 +258,7 @@ const STATUS_META = {
               link
               type="danger"
               :icon="Delete"
-              :disabled="row.status === 'processing'"
+              :disabled="row.status === 'processing' || retryingIds.has(row.id)"
               @click="removeFile(row)"
             >
               删除

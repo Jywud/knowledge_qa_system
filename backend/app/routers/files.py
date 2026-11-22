@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import aiofiles
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import BASE_DIR, settings
@@ -66,6 +66,7 @@ def _file_out(record: FileRecord, chunk_count: int, uploader: str = "") -> FileO
         version=record.version,
         status=record.status,
         status_message=record.status_message or "",
+        retryable=record.status == "failed" and record.version == 1 and chunk_count == 0,
         chunk_count=chunk_count,
         uploader=uploader,
         created_at=record.created_at,
@@ -108,6 +109,42 @@ async def upload_file(
         process_file_record, record.id, save_path, suffix, filename, kb_id
     )
     return _file_out(record, 0, admin.username)
+
+
+@router.post("/{file_id}/retry", response_model=FileOut)
+async def retry_file(
+    file_id: int,
+    background_tasks: BackgroundTasks,
+    admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> FileOut:
+    has_chunks = select(Chunk.id).where(Chunk.file_id == FileRecord.id).exists()
+    # 在同一条更新里校验并占用任务，避免并发请求重复提交。
+    record = await db.scalar(
+        update(FileRecord)
+        .where(FileRecord.id == file_id, FileRecord.status == "failed", FileRecord.version == 1, ~has_chunks)
+        .values(status="processing", status_message=None)
+        .returning(FileRecord)
+    )
+    if record is None:
+        current = await db.get(FileRecord, file_id)
+        if current is None:
+            raise HTTPException(404, "文件不存在")
+        if current.status == "processing":
+            raise HTTPException(409, "文件正在后台处理中，请稍后再试")
+        raise HTTPException(409, "仅支持重试首次入库失败的文件")
+
+    save_path = _upload_dir() / f"{record.id}_{record.filename}"
+    if _safe_filename(record.filename) != record.filename or not save_path.is_file():
+        raise HTTPException(409, "原文件不存在，请重新上传")
+
+    uploader = await db.scalar(select(User.username).where(User.id == record.uploaded_by))
+    await log_audit(db, admin, "file.retry", target=record.filename)
+    await db.commit()
+    background_tasks.add_task(
+        process_file_record, record.id, save_path, record.file_type, record.filename, record.kb_id
+    )
+    return _file_out(record, 0, uploader or "")
 
 
 @router.get("", response_model=list[FileOut])
